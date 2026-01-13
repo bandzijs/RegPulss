@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { subscribeEmail } from '@/lib/useSupabase';
 
 export default function SubscribeForm() {
   const [showModal, setShowModal] = useState(false);
@@ -25,8 +26,14 @@ export default function SubscribeForm() {
     setLoading(true);
 
     try {
-      // TODO: Integrate with your email service (e.g., Resend, SendGrid, Mailchimp)
-      console.log('Subscription email:', email);
+      // Call Supabase to save the email
+      const { data, error } = await subscribeEmail(email);
+
+      if (error) {
+        alert('Error subscribing. Please try again.');
+        console.error('Subscription error:', error.message);
+        return;
+      }
 
       // Show success modal
       setShowModal(true);
@@ -36,6 +43,7 @@ export default function SubscribeForm() {
       formElement.reset();
     } catch (error) {
       console.error('Subscription error:', error);
+      alert('An error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
