@@ -179,17 +179,18 @@ export const clearOldDuplicates = async (daysOld: number = 90): Promise<number> 
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysOld);
 
-    const { data, error } = await supabase
+    const { data, error, count } = await supabase
       .from('email_duplicates')
       .delete()
-      .lt('attempted_at', cutoffDate.toISOString());
+      .lt('attempted_at', cutoffDate.toISOString())
+      .select();
 
     if (error) {
       console.error('Error clearing old duplicates:', error);
       return 0;
     }
 
-    return data?.length || 0;
+    return count || 0;
   } catch (error) {
     console.error('Error clearing duplicates:', error);
     return 0;
