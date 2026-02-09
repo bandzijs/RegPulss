@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { ReactNode } from "react";
 import "@/app/globals.css";
 
@@ -6,7 +6,11 @@ export const metadata: Metadata = {
   title: "Regulatory Newsletter for Latvian laws",
   description:
     "AI-powered regulatory updates for Latvian legal teams — short, plain-language summaries with direct links to official sources.",
-  viewport: "width=device-width, initial-scale=1.0",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1.0,
 };
 
 export default function RootLayout({
