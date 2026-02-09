@@ -30,7 +30,7 @@ export default function RootLayout({
       </head>
       <body>
         {children}
-        <script src="https://cdn.jsdelivr.net/npm/cookieconsent@3/build/cookieconsent.min.js"></script>
+        <script async src="https://cdn.jsdelivr.net/npm/cookieconsent@3/build/cookieconsent.min.js"></script>
       </body>
     </html>
   );

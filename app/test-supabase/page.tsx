@@ -31,8 +31,9 @@ export default function TestSupabase() {
         
         setStatus('✅ Supabase is connected successfully! Ready to use.');
         setIsConnected(true);
-      } catch (error: any) {
-        setStatus(`❌ Connection error: ${error.message}`);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        setStatus(`❌ Connection error: ${errorMessage}`);
         setIsConnected(false);
       }
     };
