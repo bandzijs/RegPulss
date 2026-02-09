@@ -23,6 +23,12 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!supabase) {
+      console.warn('Supabase client not initialized');
+      setLoading(false);
+      return;
+    }
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user || null);
@@ -54,6 +60,9 @@ export const useAuth = () => {
  * const { data, error } = await signUp('user@example.com', 'password123');
  */
 export const signUp = async (email: string, password: string) => {
+  if (!supabase) {
+    return { data: null, error: { message: 'Supabase client not initialized' } };
+  }
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -73,6 +82,9 @@ export const signUp = async (email: string, password: string) => {
  * const { data, error } = await signIn('user@example.com', 'password123');
  */
 export const signIn = async (email: string, password: string) => {
+  if (!supabase) {
+    return { data: null, error: { message: 'Supabase client not initialized' } };
+  }
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
@@ -90,6 +102,9 @@ export const signIn = async (email: string, password: string) => {
  * const { error } = await signOut();
  */
 export const signOut = async () => {
+  if (!supabase) {
+    return { error: { message: 'Supabase client not initialized' } };
+  }
   const { error } = await supabase.auth.signOut();
   return { error };
 };
@@ -107,8 +122,13 @@ export const signOut = async () => {
  * @deprecated Call /api/subscribe directly for better control
  */
 export const subscribeEmail = async (email: string) => {
+  if (!supabase) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return { data: null, error: { message: 'Supabase client not initialized' } as any };
+  }
   const { data, error } = await supabase
     .from("email_subscriptions")
-    .insert({ email });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .insert({ email } as any);
   return { data, error };
 };

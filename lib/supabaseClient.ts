@@ -21,7 +21,8 @@ export const getSupabaseClient = () => {
   return supabaseClient;
 };
 
-// For backward compatibility, export a getter function
-export const supabase = null;
+// Export the client directly (will be null if env vars not set)
+export const supabase = supabaseClient;
+
 
 
