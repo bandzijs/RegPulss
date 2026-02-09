@@ -121,6 +121,20 @@ export async function POST(request: NextRequest): Promise<NextResponse<Subscribe
       
       // Check for duplicate email error
       if (error.code === '23505') {
+        // Log the duplicate attempt
+        try {
+          const userAgent = request.headers.get('user-agent') || 'unknown';
+          await supabase
+            .from('email_duplicates')
+            .insert([{
+              email,
+              reason: 'Already subscribed',
+              user_agent: userAgent,
+            }]);
+        } catch (logError) {
+          console.error('Failed to log duplicate:', logError);
+        }
+        
         return NextResponse.json(
           { error: 'This email is already subscribed.' },
           { status: 409 }
