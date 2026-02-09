@@ -1,7 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { getSupabaseClient } from '@/lib/supabaseClient';
+
+// Make this page dynamic (don't prerender) since it requires runtime environment variables
+export const dynamic = 'force-dynamic';
 
 export default function TestSupabase() {
   const [status, setStatus] = useState<string>('Testing connection...');
@@ -10,6 +13,8 @@ export default function TestSupabase() {
   useEffect(() => {
     const testConnection = async () => {
       try {
+        const supabase = getSupabaseClient();
+        
         // Test 1: Check if client is initialized
         if (!supabase) {
           setStatus('❌ Supabase client not initialized');
