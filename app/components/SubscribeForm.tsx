@@ -3,9 +3,6 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 
-const EDGE_FUNCTION_URL =
-  'https://verhrcogztsucfjrzqpb.supabase.co/functions/v1/send-confirmation';
-
 /**
  * SubscribeForm Component
  *
@@ -85,24 +82,18 @@ export default function SubscribeForm() {
       }
 
       // Step 2 – Call the Edge Function to send the confirmation email.
+      // Uses supabase.functions.invoke() which automatically attaches the
+      // correct Authorization header with the anon key.
       // If this fails we still treat the subscription as successful because
       // the row has been persisted – the user can request a re-send later.
       try {
-        const edgeResponse = await fetch(EDGE_FUNCTION_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({ record: data }),
-        });
+        const { error: fnError } = await supabase.functions.invoke(
+          'send-confirmation',
+          { body: { record: data } }
+        );
 
-        if (!edgeResponse.ok) {
-          console.error(
-            'Edge Function error:',
-            edgeResponse.status,
-            await edgeResponse.text()
-          );
+        if (fnError) {
+          console.error('Edge Function error:', fnError);
         }
       } catch (edgeFnError) {
         // Log but do NOT block the success flow
