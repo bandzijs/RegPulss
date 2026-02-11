@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from './supabaseClient';
+import { logger } from './logger';
 
 /**
  * useAuth Hook
@@ -24,7 +25,7 @@ export const useAuth = () => {
 
   useEffect(() => {
     if (!supabase) {
-      console.warn('Supabase client not initialized');
+      logger.warn('Supabase client not initialized');
       setLoading(false);
       return;
     }

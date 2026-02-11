@@ -1,7 +1,22 @@
 import type { Metadata, Viewport } from "next";
 import { ReactNode } from "react";
 import { Analytics } from "@vercel/analytics/react";
+import { Inter, Libre_Baskerville } from 'next/font/google';
 import "@/app/globals.css";
+
+const inter = Inter({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-inter',
+  display: 'swap',
+});
+
+const libreBaskerville = Libre_Baskerville({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  variable: '--font-libre',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: "Regulatory Newsletter for Latvian laws",
@@ -16,24 +31,14 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${inter.variable} ${libreBaskerville.variable}`}>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Libre+Baskerville:wght@400;700&display=swap"
-          rel="stylesheet"
-        />
         <link
           rel="stylesheet"
           href="https://cdn.jsdelivr.net/npm/cookieconsent@3/build/cookieconsent.min.css"
         />
       </head>
-      <body>
+      <body className={inter.className}>
         {children}
         <Analytics />
         <script

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { rateLimit } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 interface SubscribeRequest {
   email: string;
@@ -78,6 +80,29 @@ const validateEmail = (email: string): boolean => {
  */
 export async function POST(request: NextRequest): Promise<NextResponse<SubscribeResponse>> {
   try {
+    // Get IP address for rate limiting
+    const ip = request.headers.get('x-forwarded-for') || 
+               request.headers.get('x-real-ip') || 
+               'unknown';
+
+    // Check rate limit: 5 requests per hour per IP
+    const { allowed, remaining, resetTime } = rateLimit(ip, 5, 3600000);
+
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'Too many subscription attempts. Please try again later.' },
+        { 
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': '5',
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': new Date(resetTime).toISOString(),
+            'Retry-After': String(Math.ceil((resetTime - Date.now()) / 1000)),
+          }
+        }
+      );
+    }
+
     // Parse request body
     const body: SubscribeRequest = await request.json();
     const { email } = body;
@@ -97,19 +122,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<Subscribe
       );
     }
 
-    // Initialize Supabase client with anonymous key (server-side)
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseAnonKey) {
-      console.error('Missing Supabase environment variables');
-      return NextResponse.json(
-        { error: 'Server configuration error' },
-        { status: 500 }
-      );
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    // Initialize Supabase client (using validated environment variables)
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
 
     // Insert email into database
     const { error } = await supabase
@@ -117,7 +134,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Subscribe
       .insert([{ email }]);
 
     if (error) {
-      console.error('Supabase error:', error);
+      logger.error('Supabase subscription error', error as Error, { email });
       
       // Check for duplicate email error
       if (error.code === '23505') {
@@ -131,8 +148,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<Subscribe
               reason: 'Already subscribed',
               user_agent: userAgent,
             }]);
+          logger.info('Duplicate email attempt logged', { email });
         } catch (logError) {
-          console.error('Failed to log duplicate:', logError);
+          logger.error('Failed to log duplicate email', logError as Error, { email });
         }
         
         return NextResponse.json(
@@ -152,10 +170,17 @@ export async function POST(request: NextRequest): Promise<NextResponse<Subscribe
         success: true,
         message: 'Successfully subscribed to regulatory updates',
       },
-      { status: 201 }
+      { 
+        status: 201,
+        headers: {
+          'X-RateLimit-Limit': '5',
+          'X-RateLimit-Remaining': String(remaining),
+          'X-RateLimit-Reset': new Date(resetTime).toISOString(),
+        }
+      }
     );
   } catch (error) {
-    console.error('Subscription endpoint error:', error);
+    logger.error('Subscription endpoint error', error as Error);
     return NextResponse.json(
       { error: 'An error occurred during subscription. Please try again.' },
       { status: 500 }

@@ -1,27 +1,39 @@
 import { createClient } from '@supabase/supabase-js';
+import { env } from './env';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+/**
+ * Supabase Client
+ * 
+ * Pre-configured Supabase client using validated environment variables.
+ * Guaranteed to be initialized with correct credentials.
+ */
+const supabaseClient = createClient(
+  env.NEXT_PUBLIC_SUPABASE_URL,
+  env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
-// Only initialize Supabase client if environment variables are available
-// This prevents errors during build time when env vars might not be set
-let supabaseClient: ReturnType<typeof createClient> | null = null;
-
-if (supabaseUrl && supabaseAnonKey) {
-  supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
-} else if (typeof window !== 'undefined') {
-  // Only log warning in browser environment, not during build
-  console.warn('Supabase credentials not configured');
-}
-
+/**
+ * Get Supabase client instance
+ * 
+ * @returns {SupabaseClient} Initialized Supabase client
+ * 
+ * @example
+ * const client = getSupabaseClient();
+ * const { data } = await client.from('table').select();
+ */
 export const getSupabaseClient = () => {
-  if (!supabaseClient) {
-    throw new Error('Supabase client not initialized. Check environment variables.');
-  }
   return supabaseClient;
 };
 
-// Export the client directly (will be null if env vars not set)
+/**
+ * Supabase client instance
+ * 
+ * Direct export of the initialized Supabase client.
+ * 
+ * @example
+ * import { supabase } from '@/lib/supabaseClient';
+ * const { data } = await supabase.from('table').select();
+ */
 export const supabase = supabaseClient;
 
 

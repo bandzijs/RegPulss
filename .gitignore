@@ -11,3 +11,11 @@ build/
 *.swp
 *.swo
 *~
+
+# Prevent duplicate folders
+/RegPulss/
+**/RegPulss/
+
+# Backups
+*.zip
+*-backup-*
