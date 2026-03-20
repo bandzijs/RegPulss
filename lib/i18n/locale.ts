@@ -9,12 +9,12 @@ function parseLocale(value: string | undefined): Locale {
   if (value === 'lv' || value === 'en') {
     return value;
   }
-  return 'en';
+  return 'lv';
 }
 
 /**
  * Reads locale from the regpulss_locale cookie (set via POST /api/locale).
- * Defaults to English when missing or invalid.
+ * Defaults to Latvian when missing or invalid.
  */
 export async function getLocale(): Promise<Locale> {
   const cookieStore = await cookies();

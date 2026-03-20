@@ -13,7 +13,7 @@ export const lv: Dictionary = {
     latvian: 'Latviešu',
   },
   hero: {
-    title: 'Esiet soli priekšā normatīvo izmaiņu Latvijā.',
+    title: 'Esi soli priekšā regulējuma izmaiņām Latvijā',
     description:
       'Normatīvo aktu atjauninājumi ar tiešām saitēm uz oficiālajiem avotiem. Jūsu e-pastā.',
     formNoteBefore: 'Bez surogātpasta — jebkurā brīdī varat ',
