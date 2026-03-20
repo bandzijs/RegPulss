@@ -1,38 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import type { Dictionary } from '@/lib/i18n/types';
 
-/**
- * SubscribeForm Component
- *
- * Email subscription form with client-side validation and confirmation flow.
- * Inserts the email into `email_subscriptions` via the Supabase client,
- * retrieves the generated `confirmation_token`, and calls the
- * `send-confirmation` Edge Function so the user receives a verification email.
- *
- * @component
- * Features:
- * - Client-side email validation
- * - Direct Supabase insert with `.select().single()` to get confirmation_token
- * - Edge Function call to send confirmation email
- * - Loading state to prevent duplicate submissions
- * - Inline error messages
- * - Success modal with confirmation prompt
- * - Accessible form inputs with aria-labels
- *
- * @example
- * return <SubscribeForm />
- *
- * Accessibility:
- * - Form inputs have aria-label attributes
- * - Success modal can be dismissed by clicking outside or Close button
- * - Error messages are visible inline
- * - Button disabled state during submission
- *
- * @returns {ReactElement} Email subscription form with modal
- */
-export default function SubscribeForm() {
+interface SubscribeFormProps {
+  messages: Dictionary['subscribe'];
+}
+
+export default function SubscribeForm({ messages }: SubscribeFormProps) {
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,69 +19,41 @@ export default function SubscribeForm() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
-    // Prevent duplicate submissions while a request is in-flight
     if (loading) return;
 
     const formElement = e.currentTarget;
     const emailInput = formElement.querySelector('input[type="email"]') as HTMLInputElement;
     const email = emailInput.value.trim();
 
-    // Clear previous errors
     setError(null);
 
     if (!validateEmail(email)) {
-      setError('Please enter a valid email address.');
+      setError(messages.errorInvalidEmail);
       return;
     }
 
     setLoading(true);
 
     try {
-      // Step 1 – Insert email and retrieve the full row (including confirmation_token)
-      const { data, error: insertError } = await supabase
-        .from('email_subscriptions')
-        .insert({ email })
-        .select()
-        .single();
+      const res = await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
 
-      if (insertError) {
-        // Duplicate email (unique constraint violation)
-        if (insertError.code === '23505') {
-          setError('This email is already subscribed.');
-          return;
-        }
-        console.error('Supabase insert error:', insertError);
-        setError('Failed to subscribe. Please try again.');
+      const body = await res.json();
+
+      if (!res.ok) {
+        setError(body.error || messages.errorGeneric);
         return;
       }
 
-      // Step 2 – Call the Edge Function to send the confirmation email.
-      // Uses supabase.functions.invoke() which automatically attaches the
-      // correct Authorization header with the anon key.
-      // If this fails we still treat the subscription as successful because
-      // the row has been persisted – the user can request a re-send later.
-      try {
-        const { error: fnError } = await supabase.functions.invoke(
-          'send-confirmation',
-          { body: { record: data } }
-        );
-
-        if (fnError) {
-          console.error('Edge Function error:', fnError);
-        }
-      } catch (edgeFnError) {
-        // Log but do NOT block the success flow
-        console.error('Edge Function call failed:', edgeFnError);
-      }
-
-      // Step 3 – Show success modal and reset form
       setShowModal(true);
       document.body.style.overflow = 'hidden';
       formElement.reset();
     } catch (err) {
       console.error('Subscription error:', err);
-      setError('An error occurred. Please try again.');
+      setError(messages.errorGeneric);
     } finally {
       setLoading(false);
     }
@@ -126,9 +73,9 @@ export default function SubscribeForm() {
         type="email"
         id="email"
         name="email"
-        placeholder="Enter your work email"
+        placeholder={messages.emailPlaceholder}
         required
-        aria-label="Email address"
+        aria-label={messages.emailAriaLabel}
         className="email-input"
       />
       <button
@@ -136,17 +83,15 @@ export default function SubscribeForm() {
         className="cta-button"
         disabled={loading}
       >
-        {loading ? 'Subscribing...' : 'Subscribe'}
+        {loading ? messages.subscribing : messages.subscribe}
       </button>
 
-      {/* Error message */}
       {error && (
         <p className="error-message" style={{ color: '#DC2626', marginTop: '0.5rem', fontSize: '0.875rem' }}>
           {error}
         </p>
       )}
 
-      {/* Success Modal */}
       {showModal && (
         <div
           className="modal active"
@@ -172,12 +117,12 @@ export default function SubscribeForm() {
                 />
               </svg>
             </div>
-            <h3 className="modal-title">Almost there!</h3>
+            <h3 className="modal-title">{messages.modalTitle}</h3>
             <p className="modal-text">
-              Please check your email to confirm your subscription.
+              {messages.modalText}
             </p>
-            <button className="modal-button" onClick={handleCloseModal}>
-              Close
+            <button type="button" className="modal-button" onClick={handleCloseModal}>
+              {messages.close}
             </button>
           </div>
         </div>

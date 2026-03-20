@@ -3,6 +3,7 @@ import { ReactNode } from "react";
 import { Analytics } from "@vercel/analytics/react";
 import { Inter, Libre_Baskerville } from 'next/font/google';
 import "@/app/globals.css";
+import { getLocale } from '@/lib/i18n/locale';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -29,9 +30,12 @@ export const viewport: Viewport = {
   initialScale: 1.0,
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const locale = await getLocale();
+  const htmlLang = locale === 'lv' ? 'lv' : 'en';
+
   return (
-    <html lang="en" className={`${inter.variable} ${libreBaskerville.variable}`}>
+    <html lang={htmlLang} className={`${inter.variable} ${libreBaskerville.variable}`}>
       <head>
         <link
           rel="stylesheet"

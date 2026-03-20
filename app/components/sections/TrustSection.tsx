@@ -9,20 +9,28 @@
  *
  * @component
  * @example
- * return <TrustSection />
+ * return <TrustSection dict={dictionary} />
  *
  * @returns {ReactElement} Trust section with source list
  */
-export default function TrustSection() {
+import type { Dictionary } from '@/lib/i18n/types';
+
+interface TrustSectionProps {
+  dict: Pick<Dictionary, 'trust'>;
+}
+
+export default function TrustSection({ dict }: TrustSectionProps) {
+  const { trust } = dict;
+
   return (
     <section className="trust" id="sources">
       <div className="container">
-        <p className="trust-label">Monitoring official sources</p>
+        <p className="trust-label">{trust.label}</p>
         <div className="sources-list">
-          <span className="source">likumi.lv</span>
-          <span className="source">Saeima</span>
-          <span className="source">EUR-Lex</span>
-          <span className="source">Official regulators</span>
+          <span className="source">{trust.sourceLikumi}</span>
+          <span className="source">{trust.sourceSaeima}</span>
+          <span className="source">{trust.sourceEurLex}</span>
+          <span className="source">{trust.sourceRegulators}</span>
         </div>
       </div>
     </section>

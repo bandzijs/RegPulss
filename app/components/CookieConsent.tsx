@@ -1,11 +1,16 @@
 'use client';
 
 import { useEffect } from 'react';
+import type { Dictionary } from '@/lib/i18n/types';
 
 interface CookieConsentWindow extends Window {
   cookieconsent?: {
     initialise: (options: unknown) => void;
   };
+}
+
+interface CookieConsentProps {
+  content: Dictionary['cookie'];
 }
 
 /**
@@ -21,7 +26,7 @@ interface CookieConsentWindow extends Window {
  * - Link to privacy policy
  *
  * @example
- * return <CookieConsent />
+ * return <CookieConsent content={dict.cookie} />
  *
  * Dependencies:
  * - Requires CDN script loaded in layout.tsx:
@@ -29,9 +34,8 @@ interface CookieConsentWindow extends Window {
  *
  * @returns {null} Component returns null (CDN script handles rendering)
  */
-export default function CookieConsent() {
+export default function CookieConsent({ content }: CookieConsentProps) {
   useEffect(() => {
-    // Initialize CookieConsent by Osano
     const w = window as CookieConsentWindow;
     if (w.cookieconsent) {
       w.cookieconsent.initialise({
@@ -40,16 +44,16 @@ export default function CookieConsent() {
           button: { background: '#dc2626', text: '#ffffff' },
         },
         content: {
-          message: 'We use cookies to enhance your experience and analyze site usage.',
-          dismiss: 'Accept',
-          link: 'Privacy Policy',
+          message: content.message,
+          dismiss: content.dismiss,
+          link: content.link,
           href: '#',
         },
         theme: 'dark',
         position: 'bottom',
       });
     }
-  }, []);
+  }, [content.message, content.dismiss, content.link]);
 
   return null;
 }

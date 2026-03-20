@@ -1,13 +1,18 @@
+import LanguageSwitcher from '@/app/components/language-switcher';
+import type { Dictionary } from '@/lib/i18n/types';
+import type { Locale } from '@/lib/i18n/types';
+
 /**
  * Header Component
  *
  * Main navigation header with logo and menu links:
  * - RegPulss branding
  * - Navigation to About, Sources, and Contact sections
+ * - Language switcher (EN / LV)
  *
  * @component
  * @example
- * return <Header />
+ * return <Header locale="en" dict={dictionary} />
  *
  * Accessibility:
  * - Semantic HTML5 (header element)
@@ -15,7 +20,12 @@
  *
  * @returns {ReactElement} Navigation header with logo and menu
  */
-export default function Header() {
+interface HeaderProps {
+  locale: Locale;
+  dict: Pick<Dictionary, 'nav' | 'language'>;
+}
+
+export default function Header({ locale, dict }: HeaderProps) {
   return (
     <header className="header">
       <div className="container">
@@ -26,10 +36,24 @@ export default function Header() {
             </svg>
             <span className="logo-text">RegPulss</span>
           </div>
-          <nav className="nav">
-            <a href="#about" className="nav-link">About</a>
-            <a href="#sources" className="nav-link">Sources</a>
-            <a href="#contact" className="nav-link">Contact</a>
+          <nav className="nav" aria-label={dict.nav.ariaLabel}>
+            <a href="#about" className="nav-link">
+              {dict.nav.about}
+            </a>
+            <a href="#sources" className="nav-link">
+              {dict.nav.sources}
+            </a>
+            <a href="#contact" className="nav-link">
+              {dict.nav.contact}
+            </a>
+            <LanguageSwitcher
+              locale={locale}
+              labels={{
+                switcherAriaLabel: dict.language.switcherAriaLabel,
+                english: dict.language.english,
+                latvian: dict.language.latvian,
+              }}
+            />
           </nav>
         </div>
       </div>

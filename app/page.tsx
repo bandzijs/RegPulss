@@ -5,6 +5,8 @@ import HeroSection from '@/app/components/sections/HeroSection';
 import TrustSection from '@/app/components/sections/TrustSection';
 import BenefitsSection from '@/app/components/sections/BenefitsSection';
 import Footer from '@/app/components/sections/Footer';
+import { getDictionary } from '@/lib/i18n/dictionaries';
+import { getLocale } from '@/lib/i18n/locale';
 
 /**
  * Home Page Component
@@ -25,16 +27,19 @@ import Footer from '@/app/components/sections/Footer';
  *
  * @returns {ReactElement} Complete landing page
  */
-export default function Home() {
+export default async function Home() {
+  const locale = await getLocale();
+  const dict = getDictionary(locale);
+
   return (
     <ErrorBoundary>
       <>
-        <CookieConsent />
-        <Header />
-        <HeroSection />
-        <TrustSection />
-        <BenefitsSection />
-        <Footer />
+        <CookieConsent key={locale} content={dict.cookie} />
+        <Header locale={locale} dict={{ nav: dict.nav, language: dict.language }} />
+        <HeroSection dict={{ hero: dict.hero, subscribe: dict.subscribe }} />
+        <TrustSection dict={{ trust: dict.trust }} />
+        <BenefitsSection dict={{ benefits: dict.benefits }} />
+        <Footer dict={{ footer: dict.footer }} />
       </>
     </ErrorBoundary>
   );

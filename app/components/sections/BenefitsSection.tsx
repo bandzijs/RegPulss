@@ -8,28 +8,36 @@
  *
  * @component
  * @example
- * return <BenefitsSection />
+ * return <BenefitsSection dict={dictionary} />
  *
  * @returns {ReactElement} Benefits grid with feature cards
  */
-export default function BenefitsSection() {
+import type { Dictionary } from '@/lib/i18n/types';
+
+interface BenefitsSectionProps {
+  dict: Pick<Dictionary, 'benefits'>;
+}
+
+export default function BenefitsSection({ dict }: BenefitsSectionProps) {
+  const { benefits } = dict;
+
   return (
     <section className="benefits" id="about">
       <div className="container">
-        <h2 className="section-title">Built for professionals</h2>
+        <h2 className="section-title">{benefits.sectionTitle}</h2>
 
         <div className="benefits-grid">
           <div className="benefit">
-            <h3 className="benefit-title">Clear summaries</h3>
-            <p className="benefit-text">Plain-language explanations of what changed, why it matters, and who it affects.</p>
+            <h3 className="benefit-title">{benefits.card1Title}</h3>
+            <p className="benefit-text">{benefits.card1Text}</p>
           </div>
           <div className="benefit">
-            <h3 className="benefit-title">Direct citations</h3>
-            <p className="benefit-text">Every update includes links to official texts from likumi.lv, Saeima, and EUR-Lex.</p>
+            <h3 className="benefit-title">{benefits.card2Title}</h3>
+            <p className="benefit-text">{benefits.card2Text}</p>
           </div>
           <div className="benefit">
-            <h3 className="benefit-title">Save time</h3>
-            <p className="benefit-text">Stop manually scanning multiple legal websites. Get updates delivered to your inbox.</p>
+            <h3 className="benefit-title">{benefits.card3Title}</h3>
+            <p className="benefit-text">{benefits.card3Text}</p>
           </div>
         </div>
       </div>

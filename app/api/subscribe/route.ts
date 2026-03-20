@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { rateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
+import { sendConfirmationEmail } from '@/lib/send-confirmation-email';
+import { getDictionary } from '@/lib/i18n/dictionaries';
+import { getLocale } from '@/lib/i18n/locale';
 
 interface SubscribeRequest {
   email: string;
@@ -80,6 +83,9 @@ const validateEmail = (email: string): boolean => {
  */
 export async function POST(request: NextRequest): Promise<NextResponse<SubscribeResponse>> {
   try {
+    const locale = await getLocale();
+    const t = getDictionary(locale).apiSubscribe;
+
     // Get IP address for rate limiting
     const ip = request.headers.get('x-forwarded-for') || 
                request.headers.get('x-real-ip') || 
@@ -90,7 +96,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Subscribe
 
     if (!allowed) {
       return NextResponse.json(
-        { error: 'Too many subscription attempts. Please try again later.' },
+        { error: t.rateLimited },
         { 
           status: 429,
           headers: {
@@ -110,14 +116,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<Subscribe
     // Validate email
     if (!email || typeof email !== 'string') {
       return NextResponse.json(
-        { error: 'Email is required' },
+        { error: t.emailRequired },
         { status: 400 }
       );
     }
 
     if (!validateEmail(email)) {
       return NextResponse.json(
-        { error: 'Please enter a valid email address.' },
+        { error: t.invalidEmail },
         { status: 400 }
       );
     }
@@ -128,17 +134,17 @@ export async function POST(request: NextRequest): Promise<NextResponse<Subscribe
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
-    // Insert email into database
-    const { error } = await supabase
+    // Insert email and retrieve the row (including the DB-generated confirmation_token)
+    const { data, error } = await supabase
       .from('email_subscriptions')
-      .insert([{ email }]);
+      .insert([{ email }])
+      .select()
+      .single();
 
     if (error) {
       logger.error('Supabase subscription error', error as Error, { email });
       
-      // Check for duplicate email error
       if (error.code === '23505') {
-        // Log the duplicate attempt
         try {
           const userAgent = request.headers.get('user-agent') || 'unknown';
           await supabase
@@ -154,21 +160,31 @@ export async function POST(request: NextRequest): Promise<NextResponse<Subscribe
         }
         
         return NextResponse.json(
-          { error: 'This email is already subscribed.' },
+          { error: t.alreadySubscribed },
           { status: 409 }
         );
       }
 
       return NextResponse.json(
-        { error: 'Failed to subscribe. Please try again.' },
+        { error: t.subscribeFailed },
         { status: 500 }
       );
+    }
+
+    // Send confirmation email via SMTP (non-blocking — row is already persisted)
+    if (data?.confirmation_token) {
+      const emailResult = await sendConfirmationEmail(email, data.confirmation_token);
+      if (!emailResult.success) {
+        logger.error('Failed to send confirmation email', new Error(emailResult.error ?? 'Unknown'), { email });
+      }
+    } else {
+      logger.error('No confirmation_token returned from insert', new Error('Missing token'), { email });
     }
 
     return NextResponse.json(
       {
         success: true,
-        message: 'Successfully subscribed to regulatory updates',
+        message: t.successMessage,
       },
       { 
         status: 201,
@@ -181,8 +197,10 @@ export async function POST(request: NextRequest): Promise<NextResponse<Subscribe
     );
   } catch (error) {
     logger.error('Subscription endpoint error', error as Error);
+    const locale = await getLocale();
+    const t = getDictionary(locale).apiSubscribe;
     return NextResponse.json(
-      { error: 'An error occurred during subscription. Please try again.' },
+      { error: t.unexpectedError },
       { status: 500 }
     );
   }
