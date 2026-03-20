@@ -32,7 +32,7 @@ export const en: Dictionary = {
     item3Source: '→ EUR-Lex',
   },
   trust: {
-    label: 'Monitoring official sources',
+    label: 'Official sources',
     sourceLikumi: 'likumi.lv',
     sourceSaeima: 'Saeima',
     sourceEurLex: 'EUR-Lex',
