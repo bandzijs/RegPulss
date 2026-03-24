@@ -1,15 +1,12 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 interface SendConfirmationResult {
   success: boolean;
   error?: string;
 }
 
-const SMTP_HOST = process.env.SMTP_HOST;
-const SMTP_PORT = Number(process.env.SMTP_PORT || '465');
-const SMTP_USER = process.env.SMTP_USER;
-const SMTP_PASS = process.env.SMTP_PASS;
-const SMTP_FROM = process.env.SMTP_FROM;
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const RESEND_FROM = process.env.RESEND_FROM;
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL || 'https://reg-pulss.vercel.app';
 
@@ -17,25 +14,17 @@ export async function sendConfirmationEmail(
   email: string,
   confirmationToken: string
 ): Promise<SendConfirmationResult> {
-  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS || !SMTP_FROM) {
-    return { success: false, error: 'SMTP environment variables are not configured' };
+  if (!RESEND_API_KEY || !RESEND_FROM) {
+    return { success: false, error: 'Resend environment variables are not configured' };
   }
 
-  const transporter = nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: SMTP_PORT,
-    secure: SMTP_PORT === 465,
-    auth: {
-      user: SMTP_USER,
-      pass: SMTP_PASS,
-    },
-  });
+  const resend = new Resend(RESEND_API_KEY);
 
   const confirmUrl = `${SITE_URL}/confirm?token=${confirmationToken}`;
 
   try {
-    await transporter.sendMail({
-      from: SMTP_FROM,
+    const { error } = await resend.emails.send({
+      from: RESEND_FROM,
       to: email,
       subject: 'Confirm your RegPulss subscription',
       html: `
@@ -73,6 +62,10 @@ export async function sendConfirmationEmail(
         </div>
       `,
     });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
 
     return { success: true };
   } catch (err) {

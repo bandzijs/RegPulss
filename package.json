@@ -16,16 +16,15 @@
     "@vercel/analytics": "^1.6.1",
     "ai": "^6.0.77",
     "next": "^14.0.0",
-    "nodemailer": "^8.0.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "resend": "^6.9.4",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^20.0.0",
-    "@types/nodemailer": "^7.0.11",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^5.1.3",

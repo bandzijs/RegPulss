@@ -171,7 +171,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Subscribe
       );
     }
 
-    // Send confirmation email via SMTP (non-blocking — row is already persisted)
+    // Send confirmation email via Resend (non-blocking — row is already persisted)
     if (data?.confirmation_token) {
       const emailResult = await sendConfirmationEmail(email, data.confirmation_token);
       if (!emailResult.success) {
