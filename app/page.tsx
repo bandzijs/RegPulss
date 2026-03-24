@@ -1,10 +1,12 @@
 import CookieConsent from '@/app/components/CookieConsent';
 import { ErrorBoundary } from '@/app/components/ErrorBoundary';
+import ConfirmationToast from '@/app/components/ConfirmationToast';
 import Header from '@/app/components/sections/Header';
 import HeroSection from '@/app/components/sections/HeroSection';
 import TrustSection from '@/app/components/sections/TrustSection';
 import BenefitsSection from '@/app/components/sections/BenefitsSection';
 import Footer from '@/app/components/sections/Footer';
+import { Suspense } from 'react';
 import { getDictionary } from '@/lib/i18n/dictionaries';
 import { getLocale } from '@/lib/i18n/locale';
 
@@ -35,6 +37,9 @@ export default async function Home() {
     <ErrorBoundary>
       <>
         <CookieConsent key={locale} content={dict.cookie} />
+        <Suspense fallback={null}>
+          <ConfirmationToast />
+        </Suspense>
         <Header locale={locale} dict={{ nav: dict.nav, language: dict.language }} />
         <HeroSection dict={{ hero: dict.hero, subscribe: dict.subscribe }} />
         <TrustSection dict={{ trust: dict.trust }} />
