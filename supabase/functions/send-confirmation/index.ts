@@ -3,6 +3,10 @@ import "@supabase/functions-js/edge-runtime.d.ts";
 type RequestPayload = {
   email?: string;
   confirmationToken?: string;
+  record?: {
+    email?: string;
+    confirmation_token?: string;
+  };
 };
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
@@ -34,8 +38,8 @@ Deno.serve(async (req) => {
     );
   }
 
-  const email = payload.email?.trim();
-  const confirmationToken = payload.confirmationToken?.trim();
+  const email = (payload.record?.email ?? payload.email)?.trim();
+  const confirmationToken = (payload.record?.confirmation_token ?? payload.confirmationToken)?.trim();
 
   if (!email || !confirmationToken) {
     return new Response(
