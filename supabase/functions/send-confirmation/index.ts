@@ -6,6 +6,7 @@ type RequestPayload = {
   record?: {
     email?: string;
     confirmation_token?: string;
+    unsubscribe_token?: string;
   };
 };
 
@@ -47,6 +48,8 @@ Deno.serve(async (req) => {
       { status: 400, headers: { "Content-Type": "application/json" } },
     );
   }
+
+  const record = payload.record ?? {};
 
   const confirmUrl = `${SITE_URL}/confirm?token=${confirmationToken}`;
 
@@ -91,6 +94,16 @@ Deno.serve(async (req) => {
           <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
           <p style="color: #9ca3af; font-size: 12px;">
             If you did not subscribe to RegPulss, you can safely ignore this email.
+          </p>
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+          <p style="color: #9ca3af; font-size: 12px; text-align: center;">
+            Don't want these emails?
+            <a
+              href="${SITE_URL}/api/unsubscribe?token=${record.unsubscribe_token ?? confirmationToken}"
+              style="color: #6b7280;"
+            >
+              Unsubscribe
+            </a>
           </p>
         </div>
       `,
