@@ -1,8 +1,10 @@
 {
   "imports": {
     "@supabase/functions-js": "jsr:@supabase/functions-js@^2",
-    "react": "npm:react@^18.3.1",
-    "react-dom": "npm:react-dom@^18.3.1",
-    "@react-email/components": "npm:@react-email/components@^1.0.10"
+    "react": "npm:react@18.3.1",
+    "react-dom": "npm:react-dom@18.3.1",
+    "react/jsx-runtime": "npm:react@18.3.1/jsx-runtime",
+    "react/jsx-dev-runtime": "npm:react@18.3.1/jsx-dev-runtime",
+    "@react-email/components": "npm:@react-email/components@1.0.10"
   }
 }

@@ -1,4 +1,4 @@
-﻿import * as React from 'react';
+import * as React from 'react';
 import {
   Body,
   Button,
@@ -6,6 +6,7 @@ import {
   Head,
   Html,
   Hr,
+  Link,
   Preview,
   Section,
   Text,
@@ -90,7 +91,7 @@ function ConfirmationEmail({
 
             <Section style={{ textAlign: 'center', marginBottom: '22px' }}>
               <Button
-                href={confirmUrl}
+                href={String(confirmUrl)}
                 style={{
                   display: 'inline-block',
                   backgroundColor: '#2563eb',
@@ -116,13 +117,13 @@ function ConfirmationEmail({
                 lineHeight: '1.6',
               }}
             >
-              Donâ€™t want these emails?{' '}
-              <a
-                href={unsubscribeUrl}
+              {"Don't want these emails? "}
+              <Link
+                href={String(unsubscribeUrl)}
                 style={{ color: '#9ca3af', textDecoration: 'underline' }}
               >
                 Unsubscribe
-              </a>
+              </Link>
             </Text>
           </Section>
         </Container>

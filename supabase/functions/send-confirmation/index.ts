@@ -1,4 +1,5 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
+import * as React from "npm:react@18.3.1";
 import { render as renderAsync } from "npm:@react-email/render@2.0.4";
 import { ConfirmationEmail } from "../../../emails/confirmation.tsx";
 
@@ -55,10 +56,12 @@ Deno.serve(async (req) => {
 
   const confirmUrl = `${SITE_URL}/confirm?token=${confirmationToken}`;
 
+  const unsubscribeUrl = `${SITE_URL}/api/unsubscribe?token=${record.unsubscribe_token ?? confirmationToken}`;
+
   const html = await renderAsync(
-    ConfirmationEmail({
-      confirmUrl: confirmUrl,
-      unsubscribeUrl: `${SITE_URL}/api/unsubscribe?token=${record.unsubscribe_token ?? confirmationToken}`,
+    React.createElement(ConfirmationEmail, {
+      confirmUrl,
+      unsubscribeUrl,
     }),
   );
 
