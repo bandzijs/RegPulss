@@ -24,6 +24,9 @@ function escapeHtml(s: string): string {
 function buildConfirmationEmailHtml(confirmUrl: string, unsubscribeUrl: string): string {
   const safeConfirm = escapeHtml(confirmUrl);
   const safeUnsub = escapeHtml(unsubscribeUrl);
+  const sans =
+    "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif";
+  const serif = "Georgia, 'Times New Roman', Times, serif";
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -32,41 +35,45 @@ function buildConfirmationEmailHtml(confirmUrl: string, unsubscribeUrl: string):
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Confirm your subscription</title>
   </head>
-  <body style="margin:0;padding:0;background-color:#0b0b0b;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#0b0b0b;padding:40px 16px;">
+  <body style="margin:0;padding:0;background-color:#ffffff;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#ffffff;">
       <tr>
-        <td align="center">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background-color:#111827;border-radius:12px;border:1px solid rgba(255,255,255,0.06);overflow:hidden;">
+        <td align="center" style="padding:48px 24px 0 24px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;">
             <tr>
-              <td style="background-color:#1a1a1a;padding:16px 24px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.08);">
-                <span style="font-size:13px;font-weight:700;letter-spacing:0.12em;color:#9ca3af;">REGPULSS</span>
+              <td style="background-color:#ffffff;padding:0 0 40px 0;text-align:center;">
+                <span style="font-family:${sans};font-size:18px;font-weight:600;color:#DC2626;">&#9889;</span>
+                <span style="font-family:${sans};font-size:18px;font-weight:600;color:#1a1a1a;"> RegPulss</span>
               </td>
             </tr>
             <tr>
-              <td style="padding:32px 28px 28px 28px;">
-                <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:700;color:#ffffff;text-align:center;line-height:1.3;">
+              <td style="background-color:#ffffff;padding:0 8px 56px 8px;">
+                <h1 style="margin:0 0 32px 0;font-family:${serif};font-size:28px;font-weight:700;color:#1a1a1a;text-align:center;line-height:1.25;">
                   Confirm your subscription
                 </h1>
-                <p style="margin:0 0 28px 0;font-size:14px;line-height:1.65;color:#d1d5db;text-align:center;">
+                <p style="margin:0 auto 40px auto;font-family:${sans};font-size:15px;line-height:1.7;color:#1a1a1a;text-align:center;max-width:440px;">
                   Thank you for subscribing. Please confirm your email address by clicking the button below.
                 </p>
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                   <tr>
-                    <td align="center" style="padding-bottom:28px;">
-                      <a href="${safeConfirm}" style="display:inline-block;background-color:#1a1a1a;color:#ffffff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;border:1px solid rgba(255,255,255,0.12);">
+                    <td align="center" style="padding-bottom:48px;">
+                      <a href="${safeConfirm}" style="display:inline-block;background-color:#1a1a1a;color:#ffffff;padding:16px 40px;border-radius:0;text-decoration:none;font-family:${sans};font-weight:600;font-size:14px;letter-spacing:0.02em;">
                         Confirm Subscription
                       </a>
                     </td>
                   </tr>
                 </table>
-                <p style="margin:0 0 20px 0;font-size:13px;line-height:1.5;color:#6b7280;text-align:center;">
+                <p style="margin:0;font-family:${sans};font-size:13px;line-height:1.6;color:#666666;text-align:center;">
                   If the button does not work, copy and paste this link into your browser:<br />
-                  <a href="${safeConfirm}" style="color:#93c5fd;word-break:break-all;">${safeConfirm}</a>
+                  <a href="${safeConfirm}" style="color:#DC2626;text-decoration:underline;word-break:break-all;">${safeConfirm}</a>
                 </p>
-                <hr style="border:none;border-top:1px solid rgba(229,231,235,0.14);margin:24px 0;" />
-                <p style="margin:0;font-size:12px;line-height:1.6;color:#9ca3af;text-align:center;">
+              </td>
+            </tr>
+            <tr>
+              <td style="background-color:#f5f5f5;padding:28px 32px;text-align:center;">
+                <p style="margin:0;font-family:${sans};font-size:12px;line-height:1.65;color:#737373;">
                   Don&rsquo;t want these emails?
-                  <a href="${safeUnsub}" style="color:#9ca3af;text-decoration:underline;">Unsubscribe</a>
+                  <a href="${safeUnsub}" style="color:#737373;text-decoration:underline;">Unsubscribe</a>
                 </p>
               </td>
             </tr>
