@@ -1,4 +1,4 @@
-import * as React from 'react';
+﻿import * as React from 'react';
 import {
   Body,
   Button,
@@ -16,7 +16,7 @@ export type ConfirmationEmailProps = {
   unsubscribeUrl: string;
 };
 
-export default function ConfirmationEmail({
+function ConfirmationEmail({
   confirmUrl,
   unsubscribeUrl,
 }: ConfirmationEmailProps) {
@@ -116,7 +116,7 @@ export default function ConfirmationEmail({
                 lineHeight: '1.6',
               }}
             >
-              Don’t want these emails?{' '}
+              Donâ€™t want these emails?{' '}
               <a
                 href={unsubscribeUrl}
                 style={{ color: '#9ca3af', textDecoration: 'underline' }}
@@ -131,3 +131,5 @@ export default function ConfirmationEmail({
   );
 }
 
+export default ConfirmationEmail;
+export { ConfirmationEmail };

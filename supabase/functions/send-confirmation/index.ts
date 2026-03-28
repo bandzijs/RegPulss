@@ -1,4 +1,6 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
+import { render as renderAsync } from "npm:@react-email/render@2.0.4";
+import { ConfirmationEmail } from "../../../emails/confirmation.tsx";
 
 type RequestPayload = {
   email?: string;
@@ -53,6 +55,13 @@ Deno.serve(async (req) => {
 
   const confirmUrl = `${SITE_URL}/confirm?token=${confirmationToken}`;
 
+  const html = await renderAsync(
+    ConfirmationEmail({
+      confirmUrl: confirmUrl,
+      unsubscribeUrl: `${SITE_URL}/api/unsubscribe?token=${record.unsubscribe_token ?? confirmationToken}`,
+    }),
+  );
+
   const resendResponse = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -63,50 +72,7 @@ Deno.serve(async (req) => {
       from: "RegPulss <newsletter@regpulss.lv>",
       to: email,
       subject: "Confirm your RegPulss subscription",
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;">
-          <h2 style="color: #111827; margin-bottom: 16px;">Welcome to RegPulss!</h2>
-          <p style="color: #374151; line-height: 1.6;">
-            Thank you for subscribing to regulatory updates. Please confirm your
-            email address by clicking the button below.
-          </p>
-          <div style="text-align: center; margin: 32px 0;">
-            <a
-              href="${confirmUrl}"
-              style="
-                display: inline-block;
-                background-color: #2563eb;
-                color: #ffffff;
-                padding: 12px 32px;
-                border-radius: 6px;
-                text-decoration: none;
-                font-weight: 600;
-              "
-            >
-              Confirm Subscription
-            </a>
-          </div>
-          <p style="color: #6b7280; font-size: 14px; line-height: 1.5;">
-            If the button doesn&rsquo;t work, copy and paste this link into your
-            browser:<br />
-            <a href="${confirmUrl}" style="color: #2563eb;">${confirmUrl}</a>
-          </p>
-          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
-          <p style="color: #9ca3af; font-size: 12px;">
-            If you did not subscribe to RegPulss, you can safely ignore this email.
-          </p>
-          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
-          <p style="color: #9ca3af; font-size: 12px; text-align: center;">
-            Don't want these emails?
-            <a
-              href="${SITE_URL}/api/unsubscribe?token=${record.unsubscribe_token ?? confirmationToken}"
-              style="color: #6b7280;"
-            >
-              Unsubscribe
-            </a>
-          </p>
-        </div>
-      `,
+      html,
     }),
   });
 
