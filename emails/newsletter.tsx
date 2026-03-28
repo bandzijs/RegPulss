@@ -166,3 +166,23 @@ export default function NewsletterEmail({
   );
 }
 
+NewsletterEmail.PreviewProps = {
+  issueNumber: 1,
+  date: "March 25, 2026",
+  intro: "This week in Latvian regulatory updates...",
+  items: [
+    {
+      title: "New amendments to Labour Law",
+      summary:
+        "The Saeima passed amendments affecting overtime regulations for employees.",
+      sourceUrl: "https://likumi.lv",
+    },
+    {
+      title: "EU directive on data privacy updated",
+      summary: "EUR-Lex published updates to GDPR enforcement guidelines.",
+      sourceUrl: "https://eur-lex.europa.eu",
+    },
+  ],
+  unsubscribeUrl: "https://regpulss.lv/api/unsubscribe?token=preview",
+};
+
