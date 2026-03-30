@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { rateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
-import { sendConfirmationEmail } from '@/lib/send-confirmation-email';
+import { env } from '@/lib/env';
 import { getDictionary } from '@/lib/i18n/dictionaries';
 import { getLocale } from '@/lib/i18n/locale';
 
@@ -130,8 +130,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<Subscribe
 
     // Initialize Supabase client (using validated environment variables)
     const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      env.NEXT_PUBLIC_SUPABASE_URL,
+      env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     );
 
     // Insert email and retrieve the row (including the DB-generated confirmation_token)
@@ -171,11 +171,20 @@ export async function POST(request: NextRequest): Promise<NextResponse<Subscribe
       );
     }
 
-    // Send confirmation email via Resend (non-blocking — row is already persisted)
+    // Send confirmation email via Edge Function (non-blocking — row is already persisted)
     if (data?.confirmation_token) {
-      const emailResult = await sendConfirmationEmail(email, data.confirmation_token);
-      if (!emailResult.success) {
-        logger.error('Failed to send confirmation email', new Error(emailResult.error ?? 'Unknown'), { email });
+      const { error: functionError } = await supabase.functions.invoke('send-confirmation', {
+        body: {
+          record: {
+            email,
+            confirmation_token: data.confirmation_token,
+            unsubscribe_token: data.unsubscribe_token,
+          },
+        },
+      });
+
+      if (functionError) {
+        logger.error('Failed to invoke send-confirmation function', functionError as Error, { email });
       }
     } else {
       logger.error('No confirmation_token returned from insert', new Error('Missing token'), { email });
