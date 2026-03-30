@@ -32,7 +32,7 @@ const envSchema = z.object({
     .string()
     .url()
     .optional()
-    .default('https://regpulss.com'),
+    .default('https://regpulss.lv'),
 
   // Optional: Analytics
   NEXT_PUBLIC_VERCEL_ANALYTICS_ID: z

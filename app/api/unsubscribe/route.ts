@@ -13,12 +13,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL("/unsubscribed?status=error", req.url));
   }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("email_subscriptions")
     .update({ confirmed: false })
-    .eq("unsubscribe_token", token);
+    .eq("unsubscribe_token", token)
+    .select("id");
 
-  if (error) {
+  if (error || !data || data.length === 0) {
     return NextResponse.redirect(new URL("/unsubscribed?status=error", req.url));
   }
 

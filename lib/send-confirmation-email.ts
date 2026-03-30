@@ -8,7 +8,7 @@ interface SendConfirmationResult {
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const RESEND_FROM = process.env.RESEND_FROM;
 const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL || 'https://reg-pulss.vercel.app';
+  process.env.NEXT_PUBLIC_SITE_URL || 'https://regpulss.lv';
 
 export async function sendConfirmationEmail(
   email: string,
