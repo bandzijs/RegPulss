@@ -143,6 +143,43 @@ The landing page follows the **5 Cs framework** for high conversion:
 - `npm run test:ui` - Open test UI
 - `npm run test:coverage` - Generate test coverage report
 
+## Environment Variables
+
+Local app/runtime variables:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `NEXT_PUBLIC_SITE_URL`
+
+Supabase Edge Function secrets:
+
+- `RESEND_API_KEY` (Supabase secret)
+- `DISCORD_WEBHOOK_URL` (Supabase secret)
+- `SITE_URL` (Supabase secret)
+
+Example local setup:
+
+```bash
+cp .env.example .env.local
+```
+
+Then set values in `.env.local` for local development and in Vercel/Supabase dashboards for production.
+
+## Supabase Edge Functions
+
+Current functions:
+
+- `send-confirmation`: Sends confirmation email for new subscribers.
+- `notify-discord`: Sends Discord alert for new subscribers.
+
+Deploy commands:
+
+```bash
+supabase functions deploy send-confirmation
+supabase functions deploy notify-discord
+```
+
 ## Deployment
 
 ### Recommended: Vercel (Optimized for Next.js)

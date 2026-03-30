@@ -12,8 +12,6 @@ export default function UnsubscribedPage({
     ? "You've been unsubscribed"
     : "Something went wrong";
 
-  const accentColor = isSuccess ? "#16A34A" : "#DC2626";
-
   return (
     <main
       style={{
@@ -22,7 +20,8 @@ export default function UnsubscribedPage({
         alignItems: "center",
         justifyContent: "center",
         padding: "2rem",
-        background: "#0b0b0b",
+        background: "#ffffff",
+        fontFamily: "Inter, Arial, sans-serif",
       }}
     >
       <section
@@ -30,11 +29,11 @@ export default function UnsubscribedPage({
           maxWidth: "520px",
           width: "100%",
           textAlign: "center",
-          background: "#111827",
-          color: "#ffffff",
+          background: "#f9fafb",
+          color: "#1a1a1a",
           borderRadius: "12px",
           padding: "3rem 2rem",
-          boxShadow: "0 10px 30px rgba(0, 0, 0, 0.35)",
+          boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
         }}
       >
         <div
@@ -43,11 +42,11 @@ export default function UnsubscribedPage({
             height: "64px",
             borderRadius: "9999px",
             margin: "0 auto 1.25rem",
-            background: "rgba(255, 255, 255, 0.06)",
+            background: "#ffffff",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            color: accentColor,
+            color: "#DC2626",
             fontSize: "28px",
             fontWeight: 700,
           }}
@@ -59,14 +58,14 @@ export default function UnsubscribedPage({
           style={{
             fontSize: "1.5rem",
             fontWeight: 700,
-            color: "#ffffff",
+            color: "#1a1a1a",
             marginBottom: "0.75rem",
           }}
         >
           {message}
         </h1>
 
-        <p style={{ color: "#9CA3AF", lineHeight: 1.6 }}>
+        <p style={{ color: "#555555", lineHeight: 1.6 }}>
           {isSuccess ? "You will no longer receive emails from RegPulss." : "Please return to the homepage and try again."}
         </p>
 
@@ -76,7 +75,7 @@ export default function UnsubscribedPage({
             display: "inline-block",
             marginTop: "2rem",
             padding: "0.75rem 2rem",
-            background: "#2563eb",
+            background: "#DC2626",
             color: "#ffffff",
             borderRadius: "6px",
             textDecoration: "none",

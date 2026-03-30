@@ -123,7 +123,7 @@ function ConfirmLayout({
         stroke="currentColor"
         width={48}
         height={48}
-        style={{ color: '#16A34A' }}
+        style={{ color: '#DC2626' }}
       >
         <path
           strokeLinecap="round"
@@ -149,7 +149,8 @@ function ConfirmLayout({
         alignItems: 'center',
         justifyContent: 'center',
         padding: '2rem',
-        background: '#f9fafb',
+        background: '#ffffff',
+        fontFamily: "Inter, Arial, sans-serif",
       }}
     >
       <section
@@ -157,7 +158,7 @@ function ConfirmLayout({
           maxWidth: '480px',
           width: '100%',
           textAlign: 'center',
-          background: '#ffffff',
+          background: '#f9fafb',
           borderRadius: '12px',
           padding: '3rem 2rem',
           boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
@@ -168,20 +169,21 @@ function ConfirmLayout({
           style={{
             fontSize: '1.5rem',
             fontWeight: 700,
-            color: '#111827',
+            color: '#1a1a1a',
             marginBottom: '0.75rem',
+            fontFamily: "Inter, Arial, sans-serif",
           }}
         >
           {heading}
         </h1>
-        <p style={{ color: '#4b5563', lineHeight: 1.6 }}>{message}</p>
+        <p style={{ color: '#555555', lineHeight: 1.6 }}>{message}</p>
         <a
           href="/"
           style={{
             display: 'inline-block',
             marginTop: '2rem',
             padding: '0.75rem 2rem',
-            background: '#2563eb',
+            background: '#DC2626',
             color: '#ffffff',
             borderRadius: '6px',
             textDecoration: 'none',
