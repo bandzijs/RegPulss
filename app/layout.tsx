@@ -1,9 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { ReactNode } from "react";
 import { Analytics } from "@vercel/analytics/react";
-import { Inter, Libre_Baskerville } from 'next/font/google';
+import { Inter, Libre_Baskerville, Geist } from 'next/font/google';
 import "@/app/globals.css";
 import { getLocale } from '@/lib/i18n/locale';
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 const inter = Inter({
   subsets: ['latin'],
@@ -35,7 +38,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const htmlLang = locale === 'lv' ? 'lv' : 'en';
 
   return (
-    <html lang={htmlLang} className={`${inter.variable} ${libreBaskerville.variable}`}>
+    <html lang={htmlLang} className={cn(inter.variable, libreBaskerville.variable, "font-sans", geist.variable)}>
       <head>
         <link
           rel="stylesheet"
