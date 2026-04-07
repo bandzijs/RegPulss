@@ -3,7 +3,11 @@
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 
-export default function AdminLogoutButton() {
+interface AdminLogoutButtonProps {
+  className?: string;
+}
+
+export default function AdminLogoutButton({ className }: AdminLogoutButtonProps) {
   const router = useRouter();
 
   async function handleLogout() {
@@ -16,7 +20,7 @@ export default function AdminLogoutButton() {
   return (
     <button
       type="button"
-      className="cta-button max-w-xs"
+      className={className ?? 'cta-button max-w-xs'}
       onClick={handleLogout}
     >
       Log out
