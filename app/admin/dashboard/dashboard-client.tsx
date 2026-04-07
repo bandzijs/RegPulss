@@ -2,15 +2,37 @@
 
 import { useMemo, useState } from 'react';
 import {
-  CartesianGrid,
-  Line,
-  LineChart,
+  Area,
+  AreaChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
+import { BarChart3, Bolt, Mail, Settings, Users } from 'lucide-react';
 import AdminLogoutButton from './logout-button';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
 
 interface Subscriber {
   id: string;
@@ -61,18 +83,57 @@ function createGrowthSeries(subscribers: Subscriber[]): GrowthPoint[] {
 
 function renderPreview(subject: string, body: string) {
   return (
-    <article className="rounded-lg border border-[var(--color-border)] bg-white p-5">
-      <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)] mb-2">
-        Newsletter Preview
-      </p>
-      <h3 className="font-[family-name:var(--font-serif)] text-2xl text-[var(--color-text-primary)] mb-4">
-        {subject || '(No subject)'}
-      </h3>
-      <div className="text-sm leading-7 text-[var(--color-text-primary)] whitespace-pre-wrap">
-        {body || '(No content)'}
-      </div>
-    </article>
+    <Card className="bg-[#fdfcf9] border-[var(--color-border)] shadow-sm">
+      <CardHeader className="pb-3">
+        <CardDescription className="uppercase tracking-wider text-xs">
+          Newsletter Preview
+        </CardDescription>
+        <CardTitle className="font-[family-name:var(--font-serif)] text-2xl">
+          {subject || '(No subject)'}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="text-sm leading-7 text-[var(--color-text-primary)] whitespace-pre-wrap">
+          {body || '(No content)'}
+        </div>
+      </CardContent>
+    </Card>
   );
+}
+
+function getTrend(growthData: GrowthPoint[]): { value: string; positive: boolean } {
+  if (growthData.length < 2) {
+    return { value: '+0%', positive: true };
+  }
+
+  const latest = growthData[growthData.length - 1]?.total ?? 0;
+  const previous = growthData[growthData.length - 2]?.total ?? 0;
+
+  if (previous <= 0) {
+    return { value: '+100%', positive: true };
+  }
+
+  const percentage = ((latest - previous) / previous) * 100;
+  const sign = percentage >= 0 ? '+' : '';
+  return { value: `${sign}${percentage.toFixed(1)}%`, positive: percentage >= 0 };
+}
+
+const navItems = [
+  { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+  { id: 'subscribers', label: 'Subscribers', icon: Users },
+  { id: 'newsletter', label: 'Send Newsletter', icon: Mail },
+  { id: 'settings', label: 'Settings', icon: Settings },
+];
+
+function sidebarInitials(email: string): string {
+  return email.slice(0, 2).toUpperCase();
+}
+
+function formatGrowthLabel(date: string): string {
+  return new Date(date).toLocaleDateString('en-GB', {
+    month: 'short',
+    day: '2-digit',
+  });
 }
 
 export default function DashboardClient({
@@ -106,6 +167,7 @@ export default function DashboardClient({
     () => createGrowthSeries(subscribers),
     [subscribers]
   );
+  const trend = useMemo(() => getTrend(growthData), [growthData]);
 
   async function handleSendNewsletter() {
     if (!subject.trim() || !body.trim()) {
@@ -154,225 +216,291 @@ export default function DashboardClient({
   }
 
   return (
-    <main className="min-h-screen bg-[var(--color-background)]">
-      <header className="border-b border-[var(--color-border)] bg-[var(--color-background)]">
-        <div className="container py-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-9 h-9 rounded-md bg-[var(--color-text-primary)] text-white grid place-items-center font-bold">
-              R
-            </div>
-            <div>
-              <p className="font-semibold text-[var(--color-text-primary)]">
-                RegPulss Admin
-              </p>
-              <h1 className="font-[family-name:var(--font-serif)] text-2xl text-[var(--color-text-primary)]">
-                Dashboard
-              </h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <p className="text-sm text-[var(--color-text-secondary)]">
-              {userEmail}
-            </p>
-            <AdminLogoutButton className="cta-button !w-auto px-4 py-2 text-sm" />
-          </div>
-        </div>
-      </header>
-
-      <div className="container py-8 md:py-10 space-y-8">
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <article className="rounded-lg border border-[var(--color-border)] bg-[var(--color-background-alt)] p-5">
-            <p className="text-sm text-[var(--color-text-secondary)] mb-2">
-              Total Subscribers
-            </p>
-            <p className="text-3xl font-semibold text-[var(--color-text-primary)]">
-              {subscribers.length}
-            </p>
-          </article>
-          <article className="rounded-lg border border-[var(--color-border)] bg-[var(--color-background-alt)] p-5 md:col-span-2">
-            <p className="text-sm text-[var(--color-text-secondary)] mb-3">
-              Subscriber Growth
-            </p>
-            <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={growthData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
-                  <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#666666' }} />
-                  <YAxis tick={{ fontSize: 12, fill: '#666666' }} />
-                  <Tooltip />
-                  <Line
-                    type="monotone"
-                    dataKey="total"
-                    stroke="#DC2626"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </article>
-        </section>
-
-        {loadError ? (
-          <p className="text-sm" style={{ color: 'var(--color-accent)' }}>
-            {loadError}
-          </p>
-        ) : null}
-
-        <section className="flex gap-2 border-b border-[var(--color-border)]">
-          <button
-            type="button"
-            className={`px-4 py-3 text-sm font-medium ${
-              activeTab === 'subscribers'
-                ? 'text-[var(--color-text-primary)] border-b-2 border-[var(--color-accent)]'
-                : 'text-[var(--color-text-secondary)]'
-            }`}
-            onClick={() => setActiveTab('subscribers')}
-          >
-            Subscribers
-          </button>
-          <button
-            type="button"
-            className={`px-4 py-3 text-sm font-medium ${
-              activeTab === 'newsletter'
-                ? 'text-[var(--color-text-primary)] border-b-2 border-[var(--color-accent)]'
-                : 'text-[var(--color-text-secondary)]'
-            }`}
-            onClick={() => setActiveTab('newsletter')}
-          >
-            Send Newsletter
-          </button>
-        </section>
-
-        {activeTab === 'subscribers' ? (
-          <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-background)]">
-            <div className="p-5 border-b border-[var(--color-border)]">
-              <input
-                type="text"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search by email"
-                className="email-input !mb-0"
-              />
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-[var(--color-background-alt)] text-left">
-                    <th className="px-4 py-3 font-medium text-[var(--color-text-secondary)]">
-                      #
-                    </th>
-                    <th className="px-4 py-3 font-medium text-[var(--color-text-secondary)]">
-                      Email
-                    </th>
-                    <th className="px-4 py-3 font-medium text-[var(--color-text-secondary)]">
-                      Date Subscribed
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredSubscribers.map((entry, index) => (
-                    <tr
-                      key={entry.id}
-                      className="border-t border-[var(--color-border)]"
-                    >
-                      <td className="px-4 py-3 text-[var(--color-text-secondary)]">
-                        {index + 1}
-                      </td>
-                      <td className="px-4 py-3 text-[var(--color-text-primary)]">
-                        {entry.email}
-                      </td>
-                      <td className="px-4 py-3 text-[var(--color-text-secondary)]">
-                        {formatDate(entry.created_at)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {filteredSubscribers.length === 0 ? (
-                <p className="p-5 text-sm text-[var(--color-text-secondary)]">
-                  No subscribers found.
-                </p>
-              ) : null}
-            </div>
-          </section>
-        ) : (
-          <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-background-alt)] p-5">
-              <label
-                htmlFor="newsletter-subject"
-                className="block text-sm text-[var(--color-text-secondary)] mb-2"
-              >
-                Subject line
-              </label>
-              <input
-                id="newsletter-subject"
-                type="text"
-                value={subject}
-                onChange={(event) => setSubject(event.target.value)}
-                className="email-input"
-                placeholder="Weekly RegPulss updates"
-              />
-
-              <label
-                htmlFor="newsletter-body"
-                className="block text-sm text-[var(--color-text-secondary)] mb-2"
-              >
-                Email body
-              </label>
-              <textarea
-                id="newsletter-body"
-                value={body}
-                onChange={(event) => setBody(event.target.value)}
-                className="email-input min-h-48 resize-y"
-                placeholder="Write your newsletter..."
-              />
-
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  className="cta-button !w-auto px-4 py-2"
-                  onClick={() => setShowPreview((value) => !value)}
-                >
-                  {showPreview ? 'Hide Preview' : 'Preview'}
-                </button>
-                <button
-                  type="button"
-                  className="cta-button !w-auto px-4 py-2 bg-[var(--color-accent)] hover:bg-[#b91c1c]"
-                  onClick={handleSendNewsletter}
-                  disabled={sendState.status === 'loading'}
-                >
-                  {sendState.status === 'loading' ? 'Sending...' : 'Send'}
-                </button>
+    <main className="min-h-screen bg-white text-[var(--color-text-primary)]">
+      <div className="grid min-h-screen md:grid-cols-[260px_1fr]">
+        <aside className="bg-gray-950 text-white flex flex-col border-r border-gray-800">
+          <div className="px-6 py-6">
+            <div className="flex items-center gap-3">
+              <div className="grid h-10 w-10 place-items-center rounded-md bg-[#E53E3E]">
+                <Bolt className="h-5 w-5" />
               </div>
-
-              {sendState.status !== 'idle' ? (
-                <p
-                  className="text-sm mt-4"
-                  style={{
-                    color:
-                      sendState.status === 'success'
-                        ? 'var(--color-text-primary)'
-                        : 'var(--color-accent)',
-                  }}
-                >
-                  {sendState.message}
-                </p>
-              ) : null}
+              <div>
+                <p className="font-semibold">RegPulss Admin</p>
+                <p className="text-xs text-gray-400">Control panel</p>
+              </div>
             </div>
-
-            <div>
-              {showPreview ? (
-                renderPreview(subject, body)
-              ) : (
-                <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] p-5 text-sm text-[var(--color-text-secondary)]">
-                  Preview is hidden. Click <strong>Preview</strong> to render
-                  the newsletter.
+          </div>
+          <Separator className="bg-gray-800" />
+          <nav className="px-3 py-4 space-y-1">
+            {navItems.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                className={cn(
+                  'w-full flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                  id === 'settings'
+                    ? 'text-gray-500 cursor-not-allowed'
+                    : 'text-gray-200 hover:bg-gray-900'
+                )}
+                disabled={id === 'settings'}
+                onClick={() => {
+                  if (id === 'subscribers') setActiveTab('subscribers');
+                  if (id === 'newsletter') setActiveTab('newsletter');
+                }}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            ))}
+          </nav>
+          <div className="mt-auto p-4">
+            <Card className="border-gray-800 bg-gray-900 text-white">
+              <CardContent className="p-4 space-y-4">
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-9 w-9">
+                    <AvatarFallback className="bg-[#E53E3E] text-white">
+                      {sidebarInitials(userEmail)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm">{userEmail}</p>
+                    <p className="text-xs text-gray-400">Administrator</p>
+                  </div>
                 </div>
-              )}
-            </div>
-          </section>
-        )}
+                <AdminLogoutButton className="cta-button w-full" />
+              </CardContent>
+            </Card>
+          </div>
+        </aside>
+
+        <section className="bg-white p-6 md:p-8 lg:p-10 space-y-6">
+          <header className="space-y-1">
+            <h1 className="text-3xl font-bold font-[family-name:var(--font-serif)]">
+              Dashboard
+            </h1>
+            <p className="text-muted-foreground">
+              Manage subscribers and send RegPulss newsletters.
+            </p>
+          </header>
+
+          <div className="grid gap-6 lg:grid-cols-[1fr_2fr]">
+            <Card className="shadow-sm">
+              <CardHeader className="pb-2">
+                <CardDescription>Total Subscribers</CardDescription>
+                <CardTitle className="text-4xl">{subscribers.length}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Badge
+                  variant="secondary"
+                  className={cn(
+                    trend.positive
+                      ? 'bg-red-50 text-[#E53E3E]'
+                      : 'bg-gray-100 text-gray-700'
+                  )}
+                >
+                  {trend.value} since last day
+                </Badge>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm">
+              <CardHeader>
+                <CardTitle>Subscriber Growth</CardTitle>
+                <CardDescription>Cumulative signups over time</CardDescription>
+              </CardHeader>
+              <CardContent className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={growthData}>
+                    <defs>
+                      <linearGradient id="growthFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#E53E3E" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#E53E3E" stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis
+                      dataKey="date"
+                      tickFormatter={formatGrowthLabel}
+                      tick={{ fill: '#737373', fontSize: 12 }}
+                    />
+                    <YAxis tick={{ fill: '#737373', fontSize: 12 }} />
+                    <Tooltip />
+                    <Area
+                      type="monotone"
+                      dataKey="total"
+                      stroke="#E53E3E"
+                      strokeWidth={2}
+                      fillOpacity={1}
+                      fill="url(#growthFill)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+
+          {loadError ? (
+            <p className="text-sm text-[#E53E3E]">{loadError}</p>
+          ) : null}
+
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) =>
+              setActiveTab(value as 'subscribers' | 'newsletter')
+            }
+          >
+            <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsTrigger value="subscribers">Subscribers</TabsTrigger>
+              <TabsTrigger value="newsletter">Send Newsletter</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="subscribers" className="mt-4">
+              <Card className="shadow-sm">
+                <CardHeader>
+                  <CardTitle>Subscriber List</CardTitle>
+                  <CardDescription>
+                    Search and review newsletter subscriptions.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Filter by email..."
+                  />
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>#</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Date Subscribed</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredSubscribers.map((entry, index) => (
+                          <TableRow
+                            key={entry.id}
+                            className={cn(
+                              'hover:bg-gray-50',
+                              index % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
+                            )}
+                          >
+                            <TableCell className="text-muted-foreground">
+                              {index + 1}
+                            </TableCell>
+                            <TableCell className="font-medium">{entry.email}</TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {formatDate(entry.created_at)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge className="bg-red-50 text-[#E53E3E] hover:bg-red-50">
+                                Active
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    {filteredSubscribers.length === 0 ? (
+                      <p className="p-4 text-sm text-muted-foreground">
+                        No subscribers found.
+                      </p>
+                    ) : null}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="newsletter" className="mt-4">
+              <div className="grid gap-6 xl:grid-cols-2">
+                <Card className="shadow-sm">
+                  <CardHeader>
+                    <CardTitle>Send Newsletter</CardTitle>
+                    <CardDescription>
+                      Draft and send a bulk message to all subscribers.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="newsletter-subject"
+                        className="text-sm text-muted-foreground"
+                      >
+                        Subject line
+                      </label>
+                      <Input
+                        id="newsletter-subject"
+                        value={subject}
+                        onChange={(event) => setSubject(event.target.value)}
+                        placeholder="Weekly RegPulss updates"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="newsletter-body"
+                        className="text-sm text-muted-foreground"
+                      >
+                        Email body
+                      </label>
+                      <textarea
+                        id="newsletter-body"
+                        value={body}
+                        onChange={(event) => setBody(event.target.value)}
+                        className="flex min-h-56 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        placeholder="Write your newsletter..."
+                      />
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setShowPreview((value) => !value)}
+                      >
+                        {showPreview ? 'Hide Preview' : 'Preview'}
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleSendNewsletter}
+                        disabled={sendState.status === 'loading'}
+                        className="bg-[#E53E3E] text-white hover:bg-[#c53030]"
+                      >
+                        {sendState.status === 'loading' ? 'Sending...' : 'Send'}
+                      </Button>
+                    </div>
+                    {sendState.status !== 'idle' ? (
+                      <p
+                        className={cn(
+                          'text-sm',
+                          sendState.status === 'success'
+                            ? 'text-emerald-700'
+                            : 'text-[#E53E3E]'
+                        )}
+                      >
+                        {sendState.message}
+                      </p>
+                    ) : null}
+                  </CardContent>
+                </Card>
+
+                <div>
+                  {showPreview ? (
+                    renderPreview(subject, body)
+                  ) : (
+                    <Card className="shadow-sm">
+                      <CardHeader>
+                        <CardTitle>Email Preview</CardTitle>
+                        <CardDescription>
+                          Click Preview to render the message.
+                        </CardDescription>
+                      </CardHeader>
+                    </Card>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </section>
       </div>
     </main>
   );
