@@ -1,7 +1,5 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { redirect } from 'next/navigation';
+import { createClient } from '@/utils/supabase/server';
 
 /**
  * Admin dashboard for viewing duplicate email subscription attempts
@@ -24,93 +22,43 @@ interface DuplicateStatistic {
   unique_reasons: number;
 }
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
+function formatDate(dateString: string) {
+  return new Date(dateString).toLocaleString();
+}
 
-export default function DuplicatesAdmin() {
-  const [stats, setStats] = useState<DuplicateStatistic[]>([]);
-  const [recentAttempts, setRecentAttempts] = useState<DuplicateAttempt[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [totalAttempts, setTotalAttempts] = useState(0);
-  const [selectedEmail, setSelectedEmail] = useState<string | null>(null);
-  const [emailDetails, setEmailDetails] = useState<DuplicateAttempt[]>([]);
+export default async function DuplicatesAdminPage() {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  if (!user) {
+    redirect('/admin/login');
+  }
 
-  async function fetchData() {
-    try {
-      setLoading(true);
-
-      // Fetch statistics
-      const { data: statsData, error: statsError } = await supabase
-        .from('duplicate_statistics')
-        .select('*');
-
-      if (statsError) {
-        console.error('Error fetching stats:', statsError);
-      } else {
-        setStats(statsData || []);
-      }
-
-      // Fetch recent attempts
-      const { data: attemptsData, error: attemptsError } = await supabase
+  const [{ data: statsData, error: statsError }, { data: attemptsData, error: attemptsError }] =
+    await Promise.all([
+      supabase.from('duplicate_statistics').select('*'),
+      supabase
         .from('email_duplicates')
         .select('*')
         .order('attempted_at', { ascending: false })
-        .limit(20);
+        .limit(20),
+    ]);
 
-      if (attemptsError) {
-        console.error('Error fetching attempts:', attemptsError);
-      } else {
-        setRecentAttempts(attemptsData || []);
-        setTotalAttempts(attemptsData?.length || 0);
-      }
-    } catch (err) {
-      console.error('Error fetching data:', err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleEmailClick(email: string) {
-    setSelectedEmail(email);
-    try {
-      const { data, error } = await supabase
-        .from('email_duplicates')
-        .select('*')
-        .eq('email', email)
-        .order('attempted_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching email details:', error);
-      } else {
-        setEmailDetails(data || []);
-      }
-    } catch (err) {
-      console.error('Error:', err);
-    }
-  }
-
-  function formatDate(dateString: string) {
-    return new Date(dateString).toLocaleString();
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-900 text-white p-8">
-        <div className="text-center">Loading duplicate statistics...</div>
-      </div>
-    );
-  }
+  const stats = (statsData ?? []) as DuplicateStatistic[];
+  const recentAttempts = (attemptsData ?? []) as DuplicateAttempt[];
+  const totalAttempts = recentAttempts.length;
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-4xl font-bold mb-8">Duplicate Email Dashboard</h1>
+        {statsError || attemptsError ? (
+          <div className="mb-6 rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-200">
+            Failed to load one or more duplicate datasets.
+          </div>
+        ) : null}
 
         {/* Summary Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -136,11 +84,7 @@ export default function DuplicatesAdmin() {
             <h2 className="text-2xl font-bold mb-4">Top Duplicated Emails</h2>
             <div className="space-y-3 max-h-96 overflow-y-auto">
               {stats.map((stat) => (
-                <div
-                  key={stat.email}
-                  onClick={() => handleEmailClick(stat.email)}
-                  className="bg-gray-700 p-4 rounded cursor-pointer hover:bg-gray-600 transition-colors"
-                >
+                <div key={stat.email} className="bg-gray-700 p-4 rounded">
                   <div className="flex justify-between items-start">
                     <div className="flex-1 min-w-0">
                       <div className="font-mono text-sm truncate text-blue-400">
@@ -167,22 +111,9 @@ export default function DuplicatesAdmin() {
 
           {/* Recent Attempts or Email Details */}
           <div className="bg-gray-800 p-6 rounded-lg">
-            <h2 className="text-2xl font-bold mb-4">
-              {selectedEmail ? `Details: ${selectedEmail}` : 'Recent Attempts'}
-            </h2>
-            {selectedEmail && (
-              <button
-                onClick={() => {
-                  setSelectedEmail(null);
-                  setEmailDetails([]);
-                }}
-                className="mb-4 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm"
-              >
-                ← Back to Recent
-              </button>
-            )}
+            <h2 className="text-2xl font-bold mb-4">Recent Attempts</h2>
             <div className="space-y-2 max-h-96 overflow-y-auto">
-              {(selectedEmail ? emailDetails : recentAttempts).map((attempt) => (
+              {recentAttempts.map((attempt) => (
                 <div key={attempt.id} className="bg-gray-700 p-3 rounded text-xs">
                   <div className="flex justify-between mb-1">
                     <span className="font-mono text-blue-300">{attempt.email}</span>

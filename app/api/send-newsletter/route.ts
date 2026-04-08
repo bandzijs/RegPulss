@@ -32,6 +32,11 @@ export async function POST(request: Request) {
     );
   }
 
+  const allowedEmails = process.env.ADMIN_EMAILS?.split(',') ?? [];
+  if (!allowedEmails.includes(user.email ?? '')) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   const resendApiKey = process.env.RESEND_API_KEY;
   if (!resendApiKey) {
     return NextResponse.json(
