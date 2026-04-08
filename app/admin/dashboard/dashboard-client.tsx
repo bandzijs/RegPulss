@@ -138,7 +138,7 @@ const navItems = [
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
-const NEWSLETTER_DESIGN_KEY = 'regpulss-newsletter-design';
+const NEWSLETTER_DESIGN_KEY = 'regpulss_email_design';
 type PreviewViewport = 'desktop' | 'mobile';
 
 function sidebarInitials(email: string): string {
@@ -167,7 +167,7 @@ export default function DashboardClient({
   const [showPreview, setShowPreview] = useState(false);
   const [previewViewport, setPreviewViewport] = useState<PreviewViewport>('desktop');
   const [editorReady, setEditorReady] = useState(false);
-  const [initialDesign, setInitialDesign] = useState<object | undefined>(undefined);
+  const [initialDesign] = useState<object | undefined>(undefined);
   const [isFullscreenEditor, setIsFullscreenEditor] = useState(false);
   const [isDesignSaved, setIsDesignSaved] = useState(false);
   const [sendState, setSendState] = useState<{
@@ -175,6 +175,7 @@ export default function DashboardClient({
     message: string;
   }>({ status: 'idle', message: '' });
   const emailEditorRef = useRef<EmailEditorHandle | null>(null);
+  const uploadJsonInputRef = useRef<HTMLInputElement | null>(null);
 
   const filteredSubscribers = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -259,19 +260,27 @@ export default function DashboardClient({
     }
   }
 
-  function handleLoadDesign() {
+  function handleUploadDesignFromStorage() {
     try {
       const raw = window.localStorage.getItem(NEWSLETTER_DESIGN_KEY);
       if (!raw) {
         setSendState({
           status: 'error',
-          message: 'No saved design found in local storage.',
+          message: 'No saved design found',
         });
         return;
       }
 
       const parsed = JSON.parse(raw) as object;
-      setInitialDesign(parsed);
+      console.log('Loading design from localStorage:', parsed);
+      if (!emailEditorRef.current) {
+        setSendState({
+          status: 'error',
+          message: 'Email editor is not ready yet.',
+        });
+        return;
+      }
+      emailEditorRef.current?.loadDesign(parsed);
       setIsDesignSaved(true);
       setSendState({
         status: 'success',
@@ -283,6 +292,76 @@ export default function DashboardClient({
         status: 'error',
         message: 'Failed to load saved design.',
       });
+    }
+  }
+
+  async function handleDownloadDesign() {
+    try {
+      const design = await emailEditorRef.current?.getJson();
+      if (!design) {
+        setSendState({
+          status: 'error',
+          message: 'Email editor is not ready yet.',
+        });
+        return;
+      }
+
+      const blob = new Blob([JSON.stringify(design, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'regpulss-email-design.json';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+
+      setSendState({
+        status: 'success',
+        message: 'Design JSON downloaded.',
+      });
+    } catch (error) {
+      console.error('Download design failed:', error);
+      setSendState({
+        status: 'error',
+        message: 'Failed to download design JSON.',
+      });
+    }
+  }
+
+  function handleUploadDesignClick() {
+    uploadJsonInputRef.current?.click();
+  }
+
+  async function handleUploadDesignFile(
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      const content = await file.text();
+      const parsed = JSON.parse(content) as object;
+      console.log('Loading design from uploaded JSON:', parsed);
+      emailEditorRef.current?.loadDesign(parsed);
+      window.localStorage.setItem(NEWSLETTER_DESIGN_KEY, JSON.stringify(parsed));
+      setIsDesignSaved(true);
+      setSendState({
+        status: 'success',
+        message: 'Design uploaded successfully.',
+      });
+    } catch (error) {
+      console.error('Upload design failed:', error);
+      setSendState({
+        status: 'error',
+        message: 'Invalid JSON file. Could not load design.',
+      });
+    } finally {
+      event.target.value = '';
     }
   }
 
@@ -673,10 +752,26 @@ export default function DashboardClient({
                                 <Button
                                   type="button"
                                   variant="outline"
-                                  onClick={handleLoadDesign}
+                            onClick={handleUploadDesignFromStorage}
                                   disabled={!editorReady || sendState.status === 'loading'}
                                 >
-                                  Load Design
+                            Upload Design
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleUploadDesignClick}
+                            disabled={!editorReady || sendState.status === 'loading'}
+                          >
+                            Upload JSON
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleDownloadDesign}
+                            disabled={!editorReady || sendState.status === 'loading'}
+                          >
+                            Download JSON
                                 </Button>
                                 <Button
                                   type="button"
@@ -720,10 +815,26 @@ export default function DashboardClient({
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={handleLoadDesign}
+                        onClick={handleUploadDesignFromStorage}
                         disabled={!editorReady || sendState.status === 'loading'}
                       >
-                        Load Design
+                        Upload Design
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleUploadDesignClick}
+                        disabled={!editorReady || sendState.status === 'loading'}
+                      >
+                        Upload JSON
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleDownloadDesign}
+                        disabled={!editorReady || sendState.status === 'loading'}
+                      >
+                        Download JSON
                       </Button>
                       <Button
                         type="button"
@@ -746,6 +857,13 @@ export default function DashboardClient({
                         {sendState.message}
                       </p>
                     ) : null}
+                    <input
+                      ref={uploadJsonInputRef}
+                      type="file"
+                      accept=".json"
+                      className="hidden"
+                      onChange={handleUploadDesignFile}
+                    />
                   </CardContent>
                 </Card>
 

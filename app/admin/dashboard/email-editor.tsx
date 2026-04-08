@@ -20,6 +20,7 @@ export interface EmailEditorProps {
 export interface EmailEditorHandle {
   getHtml: () => Promise<string>;
   getJson: () => Promise<object | null>;
+  loadDesign: (design: object) => void;
 }
 
 const DashboardEmailEditor = forwardRef<EmailEditorHandle, EmailEditorProps>(
@@ -62,6 +63,13 @@ const DashboardEmailEditor = forwardRef<EmailEditorHandle, EmailEditorProps>(
             resolve((design as object) ?? null);
           });
         }),
+      loadDesign: (design: object) => {
+        const instance = editorRef.current?.editor;
+        if (!instance) {
+          return;
+        }
+        instance.loadDesign(design as never);
+      },
     }));
 
     return (
