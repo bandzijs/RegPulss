@@ -1,6 +1,16 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Area,
   AreaChart,
@@ -13,10 +23,12 @@ import {
   BarChart3,
   Bolt,
   Expand,
+  FileText,
   Mail,
   Monitor,
   Settings,
   Smartphone,
+  Trash2,
   Users,
   X,
 } from 'lucide-react';
@@ -41,7 +53,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import DashboardEmailEditor, { type EmailEditorHandle } from './email-editor';
 
@@ -56,10 +67,23 @@ interface GrowthPoint {
   total: number;
 }
 
+export interface NewsletterDraft {
+  id: string;
+  title: string | null;
+  subject: string | null;
+  html_content: string | null;
+  json_content: unknown;
+  status: string;
+  source_urls: string[] | null;
+  created_at: string;
+  sent_at: string | null;
+}
+
 interface DashboardClientProps {
   userEmail: string;
   subscribers: Subscriber[];
   loadError?: string;
+  draftsCount: number;
 }
 
 function formatDate(value: string): string {
@@ -131,8 +155,20 @@ function getTrend(growthData: GrowthPoint[]): { value: string; positive: boolean
   return { value: `${sign}${percentage.toFixed(1)}%`, positive: percentage >= 0 };
 }
 
-const navItems = [
+type SidebarSection =
+  | 'dashboard'
+  | 'drafts'
+  | 'subscribers'
+  | 'newsletter'
+  | 'settings';
+
+const navItems: {
+  id: SidebarSection;
+  label: string;
+  icon: typeof BarChart3;
+}[] = [
   { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+  { id: 'drafts', label: 'Drafts', icon: FileText },
   { id: 'subscribers', label: 'Subscribers', icon: Users },
   { id: 'newsletter', label: 'Send Newsletter', icon: Mail },
   { id: 'settings', label: 'Settings', icon: Settings },
@@ -152,21 +188,49 @@ function formatGrowthLabel(date: string): string {
   });
 }
 
+function showToast(
+  setToast: Dispatch<
+    SetStateAction<{
+      message: string;
+      type: 'success' | 'error';
+    } | null>
+  >,
+  message: string,
+  type: 'success' | 'error'
+) {
+  setToast({ message, type });
+}
+
 export default function DashboardClient({
   userEmail,
   subscribers,
   loadError,
+  draftsCount: draftsCountProp,
 }: DashboardClientProps) {
-  const [activeTab, setActiveTab] = useState<'subscribers' | 'newsletter'>(
+  const router = useRouter();
+  const [activeSection, setActiveSection] = useState<SidebarSection>(
     'subscribers'
   );
+  const [pendingDraftsCount, setPendingDraftsCount] = useState(draftsCountProp);
   const [query, setQuery] = useState('');
   const [subject, setSubject] = useState('');
   const [previewHtml, setPreviewHtml] = useState('');
   const [showPreview, setShowPreview] = useState(false);
   const [previewViewport, setPreviewViewport] = useState<PreviewViewport>('desktop');
   const [editorReady, setEditorReady] = useState(false);
-  const [initialDesign] = useState<object | undefined>(undefined);
+  const [initialDesign, setInitialDesign] = useState<object | undefined>(
+    undefined
+  );
+  const [editorDesignKey, setEditorDesignKey] = useState(0);
+  const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<NewsletterDraft[]>([]);
+  const [draftsLoading, setDraftsLoading] = useState(false);
+  const [draftsError, setDraftsError] = useState<string | null>(null);
+  const [draftActionId, setDraftActionId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{
+    message: string;
+    type: 'success' | 'error';
+  } | null>(null);
   const [isFullscreenEditor, setIsFullscreenEditor] = useState(false);
   const [isDesignSaved, setIsDesignSaved] = useState(false);
   const [sendState, setSendState] = useState<{
@@ -175,6 +239,62 @@ export default function DashboardClient({
   }>({ status: 'idle', message: '' });
   const emailEditorRef = useRef<EmailEditorHandle | null>(null);
   const uploadJsonInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    setPendingDraftsCount(draftsCountProp);
+  }, [draftsCountProp]);
+
+  useEffect(() => {
+    if (!toast) {
+      return;
+    }
+    const t = window.setTimeout(() => setToast(null), 4500);
+    return () => window.clearTimeout(t);
+  }, [toast]);
+
+  async function refreshDraftsCount() {
+    try {
+      const res = await fetch('/api/drafts');
+      const payload = (await res.json()) as { drafts?: NewsletterDraft[] };
+      if (!res.ok || !payload.drafts) {
+        return;
+      }
+      const pending = payload.drafts.filter((d) => d.status === 'draft').length;
+      setPendingDraftsCount(pending);
+      router.refresh();
+    } catch {
+      // ignore
+    }
+  }
+
+  const loadDraftsList = useCallback(async () => {
+    setDraftsLoading(true);
+    setDraftsError(null);
+    try {
+      const res = await fetch('/api/drafts');
+      const payload = (await res.json()) as
+        | { drafts: NewsletterDraft[] }
+        | { error: string };
+      if (!res.ok || !('drafts' in payload)) {
+        setDraftsError(
+          'error' in payload ? payload.error : 'Failed to load drafts'
+        );
+        return;
+      }
+      setDrafts(payload.drafts);
+    } catch (e) {
+      console.error(e);
+      setDraftsError('Failed to load drafts');
+    } finally {
+      setDraftsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeSection === 'drafts') {
+      void loadDraftsList();
+    }
+  }, [activeSection, loadDraftsList]);
 
   const filteredSubscribers = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -334,9 +454,7 @@ export default function DashboardClient({
     uploadJsonInputRef.current?.click();
   }
 
-  async function handleUploadDesignFile(
-    event: React.ChangeEvent<HTMLInputElement>
-  ) {
+  async function handleUploadDesignFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) {
       return;
@@ -361,6 +479,198 @@ export default function DashboardClient({
       });
     } finally {
       event.target.value = '';
+    }
+  }
+
+  function handleEditDraft(draft: NewsletterDraft) {
+    let design: object = {};
+    if (draft.json_content && typeof draft.json_content === 'object') {
+      design = draft.json_content as object;
+    }
+    setSubject(draft.subject ?? '');
+    setInitialDesign(design);
+    setEditorDesignKey((k) => k + 1);
+    setEditingDraftId(draft.id);
+    setPreviewHtml(draft.html_content ?? '');
+    setIsDesignSaved(false);
+    setActiveSection('newsletter');
+  }
+
+  async function handleSaveAsDraft() {
+    if (!editorReady) {
+      showToast(setToast, 'Email editor is not ready yet.', 'error');
+      return;
+    }
+
+    let html = '';
+    let json: object | null = null;
+    try {
+      html = (await emailEditorRef.current?.getHtml()) ?? '';
+      json = (await emailEditorRef.current?.getJson()) ?? null;
+    } catch (error) {
+      console.error(error);
+      showToast(setToast, 'Failed to read the email editor.', 'error');
+      return;
+    }
+
+    if (!html.trim()) {
+      showToast(setToast, 'Add content before saving a draft.', 'error');
+      return;
+    }
+
+    const title = subject.trim() || 'Untitled draft';
+    const subj = subject.trim();
+
+    try {
+      if (editingDraftId) {
+        const res = await fetch(`/api/drafts/${editingDraftId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            subject: subj,
+            html_content: html,
+            json_content: json ?? {},
+          }),
+        });
+        const payload = (await res.json()) as { error?: string };
+        if (!res.ok) {
+          showToast(
+            setToast,
+            payload.error ?? 'Failed to save draft',
+            'error'
+          );
+          return;
+        }
+        showToast(setToast, 'Draft saved.', 'success');
+      } else {
+        const res = await fetch('/api/drafts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            subject: subj,
+            html_content: html,
+            json_content: json ?? {},
+          }),
+        });
+        const payload = (await res.json()) as {
+          error?: string;
+          draft?: { id: string };
+        };
+        if (!res.ok) {
+          showToast(
+            setToast,
+            payload.error ?? 'Failed to save draft',
+            'error'
+          );
+          return;
+        }
+        if (payload.draft?.id) {
+          setEditingDraftId(payload.draft.id);
+        }
+        showToast(setToast, 'Draft saved.', 'success');
+      }
+      void refreshDraftsCount();
+      void loadDraftsList();
+    } catch (error) {
+      console.error(error);
+      showToast(setToast, 'Failed to save draft.', 'error');
+    }
+  }
+
+  async function handleSendDraft(draft: NewsletterDraft) {
+    const confirmed = window.confirm(
+      `Send newsletter to all subscribers?\n\nSubject: ${draft.subject ?? '(no subject)'}`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    const html = draft.html_content ?? '';
+    const subj = (draft.subject ?? '').trim();
+    if (!subj || !html.trim()) {
+      showToast(setToast, 'Draft is missing subject or HTML.', 'error');
+      return;
+    }
+
+    setDraftActionId(draft.id);
+    try {
+      const response = await fetch('/api/send-newsletter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject: subj, html }),
+      });
+
+      const payload = (await response.json()) as
+        | { success: true; message: string }
+        | { success: false; error: string };
+
+      if (!response.ok || !payload.success) {
+        showToast(
+          setToast,
+          'error' in payload ? payload.error : 'Failed to send newsletter',
+          'error'
+        );
+        return;
+      }
+
+      const patchRes = await fetch(`/api/drafts/${draft.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'sent',
+          sent_at: new Date().toISOString(),
+        }),
+      });
+
+      if (!patchRes.ok) {
+        showToast(
+          setToast,
+          'Newsletter sent, but draft status could not be updated.',
+          'error'
+        );
+      } else {
+        showToast(setToast, payload.message, 'success');
+      }
+
+      void loadDraftsList();
+      void refreshDraftsCount();
+    } catch (error) {
+      console.error(error);
+      showToast(setToast, 'Failed to send newsletter.', 'error');
+    } finally {
+      setDraftActionId(null);
+    }
+  }
+
+  async function handleDeleteDraft(draft: NewsletterDraft) {
+    const confirmed = window.confirm(
+      `Delete draft "${draft.title || draft.subject || 'Untitled'}"?`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setDraftActionId(draft.id);
+    try {
+      const res = await fetch(`/api/drafts/${draft.id}`, { method: 'DELETE' });
+      const payload = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        showToast(setToast, payload.error ?? 'Failed to delete draft', 'error');
+        return;
+      }
+      showToast(setToast, 'Draft deleted.', 'success');
+      if (editingDraftId === draft.id) {
+        setEditingDraftId(null);
+      }
+      void loadDraftsList();
+      void refreshDraftsCount();
+    } catch (error) {
+      console.error(error);
+      showToast(setToast, 'Failed to delete draft.', 'error');
+    } finally {
+      setDraftActionId(null);
     }
   }
 
@@ -411,24 +721,49 @@ export default function DashboardClient({
         | { success: false; error: string };
 
       if (!response.ok || !payload.success) {
+        const errMsg =
+          'error' in payload
+            ? payload.error
+            : 'Failed to send newsletter.';
         setSendState({
           status: 'error',
-          message:
-            'error' in payload
-              ? payload.error
-              : 'Failed to send newsletter.',
+          message: errMsg,
         });
+        showToast(setToast, errMsg, 'error');
         return;
       }
 
       setSendState({ status: 'success', message: payload.message });
       setPreviewHtml(html);
+      showToast(setToast, payload.message, 'success');
+
+      if (editingDraftId) {
+        const patchRes = await fetch(`/api/drafts/${editingDraftId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            status: 'sent',
+            sent_at: new Date().toISOString(),
+          }),
+        });
+        if (!patchRes.ok) {
+          showToast(
+            setToast,
+            'Sent, but draft could not be marked as sent.',
+            'error'
+          );
+        }
+        void refreshDraftsCount();
+        void loadDraftsList();
+      }
     } catch (error) {
       console.error('Newsletter send failed:', error);
+      const errMsg = 'Unexpected error while sending newsletter.';
       setSendState({
         status: 'error',
-        message: 'Unexpected error while sending newsletter.',
+        message: errMsg,
       });
+      showToast(setToast, errMsg, 'error');
     }
   }
 
@@ -454,19 +789,30 @@ export default function DashboardClient({
                 key={id}
                 type="button"
                 className={cn(
-                  'w-full flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                  'w-full flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm transition-colors',
                   id === 'settings'
                     ? 'text-gray-500 cursor-not-allowed'
-                    : 'text-gray-200 hover:bg-gray-900'
+                    : id === activeSection
+                      ? 'bg-gray-900 text-white'
+                      : 'text-gray-200 hover:bg-gray-900'
                 )}
                 disabled={id === 'settings'}
                 onClick={() => {
-                  if (id === 'subscribers') setActiveTab('subscribers');
-                  if (id === 'newsletter') setActiveTab('newsletter');
+                  if (id === 'settings') {
+                    return;
+                  }
+                  setActiveSection(id);
                 }}
               >
-                <Icon className="h-4 w-4" />
-                {label}
+                <span className="flex items-center gap-3 min-w-0">
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{label}</span>
+                </span>
+                {id === 'drafts' && pendingDraftsCount > 0 ? (
+                  <Badge className="shrink-0 border-0 bg-yellow-500 text-gray-950 hover:bg-yellow-500">
+                    {pendingDraftsCount}
+                  </Badge>
+                ) : null}
               </button>
             ))}
           </nav>
@@ -559,14 +905,138 @@ export default function DashboardClient({
             <p className="text-sm text-[#E53E3E]">{loadError}</p>
           ) : null}
 
-          <Tabs
-            value={activeTab}
-            onValueChange={(value) =>
-              setActiveTab(value as 'subscribers' | 'newsletter')
-            }
-          >
-            <TabsContent value="subscribers" className="mt-4">
+          {activeSection === 'dashboard' ? (
+            <Card className="shadow-sm mt-4">
+              <CardHeader>
+                <CardTitle>Overview</CardTitle>
+                <CardDescription>
+                  Key metrics at a glance. Use the sidebar to open subscribers,
+                  drafts, or the newsletter composer.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          ) : null}
+
+          {activeSection === 'drafts' ? (
+            <div className="mt-4 space-y-4">
               <Card className="shadow-sm">
+                <CardHeader>
+                  <CardTitle>Drafts</CardTitle>
+                  <CardDescription>
+                    Saved newsletter drafts and AI-generated drafts.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {draftsLoading ? (
+                    <p className="text-sm text-muted-foreground">Loading drafts…</p>
+                  ) : draftsError ? (
+                    <p className="text-sm text-[#E53E3E]">{draftsError}</p>
+                  ) : drafts.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No drafts yet. The AI bot will save drafts here automatically.
+                    </p>
+                  ) : (
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {drafts.map((draft) => {
+                        const isDraft =
+                          (draft.status ?? '').toLowerCase() === 'draft';
+                        const busy = draftActionId === draft.id;
+                        return (
+                          <Card key={draft.id} className="border shadow-sm">
+                            <CardHeader className="pb-2">
+                              <div className="flex items-start justify-between gap-2">
+                                <CardTitle className="text-lg font-semibold leading-tight">
+                                  {draft.title || draft.subject || 'Untitled'}
+                                </CardTitle>
+                                <Badge
+                                  className={cn(
+                                    'shrink-0 border-0',
+                                    isDraft
+                                      ? 'bg-yellow-100 text-yellow-900 hover:bg-yellow-100'
+                                      : 'bg-emerald-100 text-emerald-900 hover:bg-emerald-100'
+                                  )}
+                                >
+                                  {isDraft ? 'Draft' : 'Sent'}
+                                </Badge>
+                              </div>
+                              <CardDescription className="text-foreground/90">
+                                {draft.subject || '(No subject line)'}
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-3 text-sm">
+                              <p className="text-muted-foreground">
+                                Created {formatDate(draft.created_at)}
+                              </p>
+                              {draft.source_urls &&
+                              draft.source_urls.filter(Boolean).length > 0 ? (
+                                <div className="space-y-1">
+                                  <p className="text-xs text-muted-foreground">
+                                    Sources
+                                  </p>
+                                  <ul className="flex flex-wrap gap-2">
+                                    {draft.source_urls.filter(Boolean).map(
+                                      (url, idx) => (
+                                        <li key={`${draft.id}-src-${idx}`}>
+                                          <a
+                                            href={url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-xs text-[#E53E3E] underline break-all"
+                                          >
+                                            {url.length > 48
+                                              ? `${url.slice(0, 46)}…`
+                                              : url}
+                                          </a>
+                                        </li>
+                                      )
+                                    )}
+                                  </ul>
+                                </div>
+                              ) : null}
+                              <div className="flex flex-wrap gap-2 pt-1">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={busy}
+                                  onClick={() => handleEditDraft(draft)}
+                                >
+                                  Edit
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  disabled={busy || !isDraft}
+                                  className="bg-[#E53E3E] text-white hover:bg-[#c53030]"
+                                  onClick={() => void handleSendDraft(draft)}
+                                >
+                                  Send
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={busy}
+                                  onClick={() => void handleDeleteDraft(draft)}
+                                  className="text-[#E53E3E] border-[#fecaca]"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-1" />
+                                  Delete
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          ) : null}
+
+          {activeSection === 'subscribers' ? (
+              <Card className="shadow-sm mt-4">
                 <CardHeader>
                   <CardTitle>Subscriber List</CardTitle>
                   <CardDescription>
@@ -622,10 +1092,10 @@ export default function DashboardClient({
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+          ) : null}
 
-            <TabsContent value="newsletter" className="mt-4">
-              <div className="grid gap-6 xl:grid-cols-2">
+          {activeSection === 'newsletter' ? (
+              <div className="grid gap-6 xl:grid-cols-2 mt-4">
                 <Card className="shadow-sm">
                   <CardHeader>
                     <CardTitle>Send Newsletter</CardTitle>
@@ -776,6 +1246,14 @@ export default function DashboardClient({
                                 </Button>
                                 <Button
                                   type="button"
+                                  variant="outline"
+                                  onClick={() => void handleSaveAsDraft()}
+                                  disabled={!editorReady || sendState.status === 'loading'}
+                                >
+                                  Save as Draft
+                                </Button>
+                                <Button
+                                  type="button"
                                   onClick={handleSendNewsletter}
                                   disabled={!editorReady || sendState.status === 'loading'}
                                   className="bg-[#E53E3E] text-white hover:bg-[#c53030]"
@@ -788,6 +1266,7 @@ export default function DashboardClient({
                             </div>
                           ) : null}
                           <DashboardEmailEditor
+                            key={editorDesignKey}
                             ref={emailEditorRef}
                             onReady={() => setEditorReady(true)}
                             onExportHtml={(html) => {
@@ -831,14 +1310,24 @@ export default function DashboardClient({
                             Download JSON
                           </Button>
                         </div>
-                        <Button
-                          type="button"
-                          onClick={handleSendNewsletter}
-                          disabled={!editorReady || sendState.status === 'loading'}
-                          className="bg-[#E53E3E] text-white hover:bg-[#c53030]"
-                        >
-                          {sendState.status === 'loading' ? 'Sending...' : 'Send Newsletter'}
-                        </Button>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => void handleSaveAsDraft()}
+                            disabled={!editorReady || sendState.status === 'loading'}
+                          >
+                            Save as Draft
+                          </Button>
+                          <Button
+                            type="button"
+                            onClick={handleSendNewsletter}
+                            disabled={!editorReady || sendState.status === 'loading'}
+                            className="bg-[#E53E3E] text-white hover:bg-[#c53030]"
+                          >
+                            {sendState.status === 'loading' ? 'Sending...' : 'Send Newsletter'}
+                          </Button>
+                        </div>
                       </div>
                     </div>
                     {sendState.status !== 'idle' ? (
@@ -874,8 +1363,7 @@ export default function DashboardClient({
                   </Card>
                 </div>
               </div>
-            </TabsContent>
-          </Tabs>
+          ) : null}
           {showPreview ? (
             <div className="fixed inset-0 z-50 bg-black/50 p-4 md:p-8 overflow-y-auto">
               <div className="mx-auto max-w-5xl rounded-lg bg-white p-4 shadow-xl">
@@ -918,6 +1406,19 @@ export default function DashboardClient({
           ) : null}
         </section>
       </div>
+      {toast ? (
+        <div
+          role="status"
+          className={cn(
+            'fixed bottom-6 right-6 z-[100] max-w-sm rounded-md border px-4 py-3 text-sm shadow-lg',
+            toast.type === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+              : 'border-red-200 bg-red-50 text-[#991b1b]'
+          )}
+        >
+          {toast.message}
+        </div>
+      ) : null}
     </main>
   );
 }

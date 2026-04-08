@@ -28,11 +28,19 @@ export default async function AdminDashboardPage() {
     ? 'Could not load subscribers. Check database access for authenticated users.'
     : undefined;
 
+  const { count: draftsCountRaw } = await supabase
+    .from('newsletters')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'draft');
+
+  const draftsCount = draftsCountRaw ?? 0;
+
   return (
     <DashboardClient
       userEmail={user.email ?? 'Unknown user'}
       subscribers={subscribers}
       loadError={loadError}
+      draftsCount={draftsCount}
     />
   );
 }
