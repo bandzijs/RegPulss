@@ -114,17 +114,15 @@ export async function POST(request: NextRequest): Promise<NextResponse<Subscribe
     const body = (await request.json()) as SubscribeRequest;
     const { email } = body;
 
-    // Try multiple sources for locale (Cloudflare / proxies may not forward cookies to API routes)
-    const cookieLocale = request.cookies.get('regpulss_locale')?.value;
+    // Header takes priority since cookie may be stale or missing
     const headerLocale = request.headers.get('x-locale');
-    const refererLocale = request.headers.get('referer')?.includes('/lv') ? 'lv' : undefined;
+    const cookieLocale = request.cookies.get('regpulss_locale')?.value;
 
-    const rawLocale = cookieLocale || headerLocale || refererLocale;
+    const rawLocale = headerLocale || cookieLocale;
     const confirmationLocale: Locale = isLocale(rawLocale) ? rawLocale : 'en';
     console.log('locale sources:', {
-      cookieLocale,
       headerLocale,
-      refererLocale,
+      cookieLocale,
       final: confirmationLocale,
     });
 
