@@ -201,6 +201,16 @@ function showToast(
   setToast({ message, type });
 }
 
+function draftHasJsonContent(json: unknown): boolean {
+  if (json == null) {
+    return false;
+  }
+  if (typeof json !== 'object' || Array.isArray(json)) {
+    return false;
+  }
+  return Object.keys(json as Record<string, unknown>).length > 0;
+}
+
 export default function DashboardClient({
   userEmail,
   subscribers,
@@ -232,6 +242,8 @@ export default function DashboardClient({
     type: 'success' | 'error';
   } | null>(null);
   const [isFullscreenEditor, setIsFullscreenEditor] = useState(false);
+  const [htmlDraftMode, setHtmlDraftMode] = useState(false);
+  const [rawHtmlContent, setRawHtmlContent] = useState('');
   const [isDesignSaved, setIsDesignSaved] = useState(false);
   const [sendState, setSendState] = useState<{
     status: 'idle' | 'loading' | 'success' | 'error';
@@ -312,7 +324,8 @@ export default function DashboardClient({
   );
   const trend = useMemo(() => getTrend(growthData), [growthData]);
   const emailBodyStats = useMemo(() => {
-    const text = previewHtml
+    const source = htmlDraftMode ? rawHtmlContent : previewHtml;
+    const text = source
       .replace(/<style[\s\S]*?<\/style>/gi, ' ')
       .replace(/<script[\s\S]*?<\/script>/gi, ' ')
       .replace(/<[^>]+>/g, ' ')
@@ -321,7 +334,9 @@ export default function DashboardClient({
     const characters = text.length;
     const words = text ? text.split(' ').length : 0;
     return { words, characters };
-  }, [previewHtml]);
+  }, [htmlDraftMode, rawHtmlContent, previewHtml]);
+
+  const newsletterReady = htmlDraftMode || editorReady;
 
   async function handlePreviewNewsletter() {
     if (!subject.trim()) {
@@ -329,6 +344,21 @@ export default function DashboardClient({
         status: 'error',
         message: 'Subject is required.',
       });
+      return;
+    }
+
+    if (htmlDraftMode) {
+      const html = rawHtmlContent.trim();
+      if (!html) {
+        setSendState({
+          status: 'error',
+          message: 'Add HTML content before preview.',
+        });
+        return;
+      }
+      setPreviewHtml(html);
+      setShowPreview(true);
+      setSendState({ status: 'idle', message: '' });
       return;
     }
 
@@ -483,20 +513,142 @@ export default function DashboardClient({
   }
 
   function handleEditDraft(draft: NewsletterDraft) {
-    let design: object = {};
-    if (draft.json_content && typeof draft.json_content === 'object') {
-      design = draft.json_content as object;
-    }
     setSubject(draft.subject ?? '');
-    setInitialDesign(design);
-    setEditorDesignKey((k) => k + 1);
     setEditingDraftId(draft.id);
-    setPreviewHtml(draft.html_content ?? '');
     setIsDesignSaved(false);
     setActiveSection('newsletter');
+    setIsFullscreenEditor(false);
+
+    if (draftHasJsonContent(draft.json_content)) {
+      setHtmlDraftMode(false);
+      setRawHtmlContent('');
+      setEditorReady(false);
+      setInitialDesign(draft.json_content as object);
+      setEditorDesignKey((k) => k + 1);
+      setPreviewHtml(draft.html_content ?? '');
+    } else {
+      setHtmlDraftMode(true);
+      setEditorReady(false);
+      setInitialDesign(undefined);
+      const html = draft.html_content ?? '';
+      setRawHtmlContent(html);
+      setPreviewHtml(html);
+      setEditorDesignKey((k) => k + 1);
+    }
+  }
+
+  async function handleSaveHtmlDraftChanges() {
+    if (!editingDraftId || !htmlDraftMode) {
+      showToast(setToast, 'No AI draft is being edited.', 'error');
+      return;
+    }
+
+    const html = rawHtmlContent.trim();
+    if (!html) {
+      showToast(setToast, 'HTML content is required.', 'error');
+      return;
+    }
+
+    const title = subject.trim() || 'Untitled draft';
+    const subj = subject.trim();
+
+    try {
+      const res = await fetch(`/api/drafts/${editingDraftId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          subject: subj,
+          html_content: html,
+        }),
+      });
+      const payload = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        showToast(
+          setToast,
+          payload.error ?? 'Failed to save draft',
+          'error'
+        );
+        return;
+      }
+      showToast(setToast, 'Draft saved.', 'success');
+      void refreshDraftsCount();
+      void loadDraftsList();
+    } catch (error) {
+      console.error(error);
+      showToast(setToast, 'Failed to save draft.', 'error');
+    }
   }
 
   async function handleSaveAsDraft() {
+    if (htmlDraftMode) {
+      const html = rawHtmlContent.trim();
+      if (!html) {
+        showToast(setToast, 'Add content before saving a draft.', 'error');
+        return;
+      }
+
+      const title = subject.trim() || 'Untitled draft';
+      const subj = subject.trim();
+
+      try {
+        if (editingDraftId) {
+          const res = await fetch(`/api/drafts/${editingDraftId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title,
+              subject: subj,
+              html_content: html,
+            }),
+          });
+          const payload = (await res.json()) as { error?: string };
+          if (!res.ok) {
+            showToast(
+              setToast,
+              payload.error ?? 'Failed to save draft',
+              'error'
+            );
+            return;
+          }
+          showToast(setToast, 'Draft saved.', 'success');
+        } else {
+          const res = await fetch('/api/drafts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title,
+              subject: subj,
+              html_content: html,
+              json_content: {},
+            }),
+          });
+          const payload = (await res.json()) as {
+            error?: string;
+            draft?: { id: string };
+          };
+          if (!res.ok) {
+            showToast(
+              setToast,
+              payload.error ?? 'Failed to save draft',
+              'error'
+            );
+            return;
+          }
+          if (payload.draft?.id) {
+            setEditingDraftId(payload.draft.id);
+          }
+          showToast(setToast, 'Draft saved.', 'success');
+        }
+        void refreshDraftsCount();
+        void loadDraftsList();
+      } catch (error) {
+        console.error(error);
+        showToast(setToast, 'Failed to save draft.', 'error');
+      }
+      return;
+    }
+
     if (!editorReady) {
       showToast(setToast, 'Email editor is not ready yet.', 'error');
       return;
@@ -663,6 +815,8 @@ export default function DashboardClient({
       showToast(setToast, 'Draft deleted.', 'success');
       if (editingDraftId === draft.id) {
         setEditingDraftId(null);
+        setHtmlDraftMode(false);
+        setRawHtmlContent('');
       }
       void loadDraftsList();
       void refreshDraftsCount();
@@ -684,16 +838,20 @@ export default function DashboardClient({
     }
 
     let html = '';
-    try {
-      const exported = await emailEditorRef.current?.getHtml();
-      html = exported ?? '';
-    } catch (error) {
-      console.error('Send export failed:', error);
-      setSendState({
-        status: 'error',
-        message: 'Failed to export HTML from the email editor.',
-      });
-      return;
+    if (htmlDraftMode) {
+      html = rawHtmlContent.trim();
+    } else {
+      try {
+        const exported = await emailEditorRef.current?.getHtml();
+        html = exported ?? '';
+      } catch (error) {
+        console.error('Send export failed:', error);
+        setSendState({
+          status: 'error',
+          message: 'Failed to export HTML from the email editor.',
+        });
+        return;
+      }
     }
 
     if (!html.trim()) {
@@ -1120,144 +1278,337 @@ export default function DashboardClient({
                       />
                     </div>
                     <div className="w-full space-y-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <label
-                          htmlFor="newsletter-editor"
-                          className="text-sm text-muted-foreground"
-                        >
-                          Email body
-                        </label>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setIsFullscreenEditor((value) => !value)}
-                            disabled={!editorReady}
-                          >
-                            {isFullscreenEditor ? (
-                              <>
-                                <X className="mr-1 h-4 w-4" />
-                                Exit Fullscreen
-                              </>
-                            ) : (
-                              <>
-                                <Expand className="mr-1 h-4 w-4" />
-                                Fullscreen
-                              </>
+                      {htmlDraftMode ? (
+                        <>
+                          <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                            AI-generated draft — edit HTML directly below
+                          </div>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <label
+                              htmlFor="newsletter-html-raw"
+                              className="text-sm text-muted-foreground"
+                            >
+                              Email body (HTML)
+                            </label>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handlePreviewNewsletter}
+                                disabled={sendState.status === 'loading'}
+                              >
+                                Preview
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => void handleSaveHtmlDraftChanges()}
+                                disabled={sendState.status === 'loading'}
+                              >
+                                Save changes
+                              </Button>
+                            </div>
+                          </div>
+                          <textarea
+                            id="newsletter-html-raw"
+                            className="w-full min-h-[600px] resize-y rounded-md border border-input bg-background p-3 font-mono text-sm leading-relaxed"
+                            style={{ height: '600px' }}
+                            value={rawHtmlContent}
+                            onChange={(event) => {
+                              const v = event.target.value;
+                              setRawHtmlContent(v);
+                              setPreviewHtml(v);
+                            }}
+                            spellCheck={false}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            {emailBodyStats.words} words •{' '}
+                            {emailBodyStats.characters} characters
+                          </p>
+                          <div className="border-t border-[var(--color-border)] pt-4">
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => void handleSaveAsDraft()}
+                                disabled={sendState.status === 'loading'}
+                              >
+                                Save as Draft
+                              </Button>
+                              <Button
+                                type="button"
+                                onClick={handleSendNewsletter}
+                                disabled={sendState.status === 'loading'}
+                                className="bg-[#E53E3E] text-white hover:bg-[#c53030]"
+                              >
+                                {sendState.status === 'loading'
+                                  ? 'Sending...'
+                                  : 'Send Newsletter'}
+                              </Button>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <label
+                              htmlFor="newsletter-editor"
+                              className="text-sm text-muted-foreground"
+                            >
+                              Email body
+                            </label>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() =>
+                                  setIsFullscreenEditor((value) => !value)
+                                }
+                                disabled={!editorReady}
+                              >
+                                {isFullscreenEditor ? (
+                                  <>
+                                    <X className="mr-1 h-4 w-4" />
+                                    Exit Fullscreen
+                                  </>
+                                ) : (
+                                  <>
+                                    <Expand className="mr-1 h-4 w-4" />
+                                    Fullscreen
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handlePreviewNewsletter}
+                                disabled={
+                                  !newsletterReady ||
+                                  sendState.status === 'loading'
+                                }
+                              >
+                                Preview
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleSaveDesign}
+                                disabled={
+                                  !newsletterReady ||
+                                  sendState.status === 'loading'
+                                }
+                              >
+                                Save Design
+                                <span
+                                  className={cn(
+                                    'ml-2 h-2 w-2 rounded-full',
+                                    isDesignSaved
+                                      ? 'bg-emerald-500'
+                                      : 'bg-gray-400'
+                                  )}
+                                />
+                              </Button>
+                            </div>
+                          </div>
+                          <div
+                            className={cn(
+                              isFullscreenEditor
+                                ? 'fixed inset-0 z-50 bg-white p-4 md:p-6 overflow-y-auto'
+                                : ''
                             )}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handlePreviewNewsletter}
-                            disabled={!editorReady || sendState.status === 'loading'}
                           >
-                            Preview
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleSaveDesign}
-                            disabled={!editorReady || sendState.status === 'loading'}
-                          >
-                            Save Design
-                            <span
-                              className={cn(
-                                'ml-2 h-2 w-2 rounded-full',
-                                isDesignSaved ? 'bg-emerald-500' : 'bg-gray-400'
-                              )}
-                            />
-                          </Button>
-                        </div>
-                      </div>
-                      <div
-                        className={cn(
-                          isFullscreenEditor
-                            ? 'fixed inset-0 z-50 bg-white p-4 md:p-6 overflow-y-auto'
-                            : ''
-                        )}
-                      >
-                        <div className="w-full">
-                          {isFullscreenEditor ? (
-                            <div className="mb-4 space-y-4">
-                              <div className="flex items-center justify-between gap-3">
-                                <p className="text-sm text-muted-foreground">
-                                  Fullscreen Email Editor
-                                </p>
+                            <div className="w-full">
+                              {isFullscreenEditor ? (
+                                <div className="mb-4 space-y-4">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <p className="text-sm text-muted-foreground">
+                                      Fullscreen Email Editor
+                                    </p>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      onClick={() => setIsFullscreenEditor(false)}
+                                    >
+                                      <X className="mr-1 h-4 w-4" />
+                                      Close
+                                    </Button>
+                                  </div>
+                                  <Input
+                                    className="w-full"
+                                    value={subject}
+                                    onChange={(event) =>
+                                      setSubject(event.target.value)
+                                    }
+                                    placeholder="Weekly RegPulss updates"
+                                  />
+                                  <div className="flex flex-wrap gap-2">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      onClick={handleSaveDesign}
+                                      disabled={
+                                        !newsletterReady ||
+                                        sendState.status === 'loading'
+                                      }
+                                    >
+                                      Save Design
+                                      <span
+                                        className={cn(
+                                          'ml-2 h-2 w-2 rounded-full',
+                                          isDesignSaved
+                                            ? 'bg-emerald-500'
+                                            : 'bg-gray-400'
+                                        )}
+                                      />
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      onClick={handleUploadDesignFromStorage}
+                                      disabled={
+                                        !newsletterReady ||
+                                        sendState.status === 'loading'
+                                      }
+                                    >
+                                      Upload Design
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      onClick={handleUploadDesignClick}
+                                      disabled={
+                                        !newsletterReady ||
+                                        sendState.status === 'loading'
+                                      }
+                                    >
+                                      Upload JSON
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      onClick={handleDownloadDesign}
+                                      disabled={
+                                        !newsletterReady ||
+                                        sendState.status === 'loading'
+                                      }
+                                    >
+                                      Download JSON
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      onClick={handlePreviewNewsletter}
+                                      disabled={
+                                        !newsletterReady ||
+                                        sendState.status === 'loading'
+                                      }
+                                    >
+                                      Preview
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      onClick={() => void handleSaveAsDraft()}
+                                      disabled={
+                                        !newsletterReady ||
+                                        sendState.status === 'loading'
+                                      }
+                                    >
+                                      Save as Draft
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      onClick={handleSendNewsletter}
+                                      disabled={
+                                        !newsletterReady ||
+                                        sendState.status === 'loading'
+                                      }
+                                      className="bg-[#E53E3E] text-white hover:bg-[#c53030]"
+                                    >
+                                      {sendState.status === 'loading'
+                                        ? 'Sending...'
+                                        : 'Send Newsletter'}
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : null}
+                              <DashboardEmailEditor
+                                key={editorDesignKey}
+                                ref={emailEditorRef}
+                                onReady={() => setEditorReady(true)}
+                                onExportHtml={(html) => {
+                                  setPreviewHtml(html);
+                                  setIsDesignSaved(false);
+                                }}
+                                initialDesign={initialDesign}
+                                minHeight={
+                                  isFullscreenEditor
+                                    ? 'calc(100vh - 130px)'
+                                    : 750
+                                }
+                              />
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {emailBodyStats.words} words •{' '}
+                            {emailBodyStats.characters} characters
+                          </p>
+                          <div className="border-t border-[var(--color-border)] pt-4">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div className="flex flex-wrap items-center gap-3">
                                 <Button
                                   type="button"
                                   variant="outline"
-                                  onClick={() => setIsFullscreenEditor(false)}
+                                  onClick={handleUploadDesignFromStorage}
+                                  disabled={
+                                    !newsletterReady ||
+                                    sendState.status === 'loading'
+                                  }
                                 >
-                                  <X className="mr-1 h-4 w-4" />
-                                  Close
+                                  Upload Design
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={handleUploadDesignClick}
+                                  disabled={
+                                    !newsletterReady ||
+                                    sendState.status === 'loading'
+                                  }
+                                >
+                                  Upload JSON
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={handleDownloadDesign}
+                                  disabled={
+                                    !newsletterReady ||
+                                    sendState.status === 'loading'
+                                  }
+                                >
+                                  Download JSON
                                 </Button>
                               </div>
-                              <Input
-                                className="w-full"
-                                value={subject}
-                                onChange={(event) => setSubject(event.target.value)}
-                                placeholder="Weekly RegPulss updates"
-                              />
-                              <div className="flex flex-wrap gap-2">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={handleSaveDesign}
-                                  disabled={!editorReady || sendState.status === 'loading'}
-                                >
-                                  Save Design
-                                  <span
-                                    className={cn(
-                                      'ml-2 h-2 w-2 rounded-full',
-                                      isDesignSaved ? 'bg-emerald-500' : 'bg-gray-400'
-                                    )}
-                                  />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                            onClick={handleUploadDesignFromStorage}
-                                  disabled={!editorReady || sendState.status === 'loading'}
-                                >
-                            Upload Design
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleUploadDesignClick}
-                            disabled={!editorReady || sendState.status === 'loading'}
-                          >
-                            Upload JSON
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleDownloadDesign}
-                            disabled={!editorReady || sendState.status === 'loading'}
-                          >
-                            Download JSON
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={handlePreviewNewsletter}
-                                  disabled={!editorReady || sendState.status === 'loading'}
-                                >
-                                  Preview
-                                </Button>
+                              <div className="flex flex-wrap items-center gap-2">
                                 <Button
                                   type="button"
                                   variant="outline"
                                   onClick={() => void handleSaveAsDraft()}
-                                  disabled={!editorReady || sendState.status === 'loading'}
+                                  disabled={
+                                    !newsletterReady ||
+                                    sendState.status === 'loading'
+                                  }
                                 >
                                   Save as Draft
                                 </Button>
                                 <Button
                                   type="button"
                                   onClick={handleSendNewsletter}
-                                  disabled={!editorReady || sendState.status === 'loading'}
+                                  disabled={
+                                    !newsletterReady ||
+                                    sendState.status === 'loading'
+                                  }
                                   className="bg-[#E53E3E] text-white hover:bg-[#c53030]"
                                 >
                                   {sendState.status === 'loading'
@@ -1266,75 +1617,9 @@ export default function DashboardClient({
                                 </Button>
                               </div>
                             </div>
-                          ) : null}
-                          <DashboardEmailEditor
-                            key={editorDesignKey}
-                            ref={emailEditorRef}
-                            onReady={() => setEditorReady(true)}
-                            onExportHtml={(html) => {
-                              setPreviewHtml(html);
-                              setIsDesignSaved(false);
-                            }}
-                            initialDesign={initialDesign}
-                            minHeight={
-                              isFullscreenEditor
-                                ? 'calc(100vh - 130px)'
-                                : 750
-                            }
-                          />
-                        </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {emailBodyStats.words} words • {emailBodyStats.characters} characters
-                      </p>
-                    </div>
-                    <div className="border-t border-[var(--color-border)] pt-4">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex flex-wrap items-center gap-3">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleUploadDesignFromStorage}
-                            disabled={!editorReady || sendState.status === 'loading'}
-                          >
-                            Upload Design
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleUploadDesignClick}
-                            disabled={!editorReady || sendState.status === 'loading'}
-                          >
-                            Upload JSON
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleDownloadDesign}
-                            disabled={!editorReady || sendState.status === 'loading'}
-                          >
-                            Download JSON
-                          </Button>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => void handleSaveAsDraft()}
-                            disabled={!editorReady || sendState.status === 'loading'}
-                          >
-                            Save as Draft
-                          </Button>
-                          <Button
-                            type="button"
-                            onClick={handleSendNewsletter}
-                            disabled={!editorReady || sendState.status === 'loading'}
-                            className="bg-[#E53E3E] text-white hover:bg-[#c53030]"
-                          >
-                            {sendState.status === 'loading' ? 'Sending...' : 'Send Newsletter'}
-                          </Button>
-                        </div>
-                      </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                     {sendState.status !== 'idle' ? (
                       <p
