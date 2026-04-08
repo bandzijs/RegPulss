@@ -1,100 +1,108 @@
-/**
- * Simple in-memory rate limiting implementation
- * 
- * Tracks request counts per IP address with time-based windows.
- * Automatically cleans up expired entries to prevent memory leaks.
- * 
- * @module rateLimit
- */
+import { createClient } from '@supabase/supabase-js';
+import { env } from '@/lib/env';
 
-interface RateLimitRecord {
-  count: number;
-  resetTime: number;
+const ONE_HOUR_MS = 60 * 60 * 1000;
+
+interface RateLimitRow {
+  identifier: string;
+  endpoint: string;
+  request_count: number;
+  window_start: string;
 }
 
-interface RateLimitStore {
-  [key: string]: RateLimitRecord;
-}
-
-const store: RateLimitStore = {};
-
-/**
- * Rate limit checker
- * 
- * Implements sliding window rate limiting per IP address.
- * Returns whether the request should be allowed and remaining quota.
- * 
- * @param {string} identifier - Unique identifier (usually IP address)
- * @param {number} maxRequests - Maximum requests allowed in time window (default: 5)
- * @param {number} windowMs - Time window in milliseconds (default: 3600000 = 1 hour)
- * @returns {Object} Rate limit result
- * @returns {boolean} allowed - Whether request should be allowed
- * @returns {number} remaining - Number of requests remaining in window
- * @returns {number} resetTime - Timestamp when limit resets
- * 
- * @example
- * const { allowed, remaining } = rateLimit('192.168.1.1', 5, 3600000);
- * if (!allowed) {
- *   return new Response('Too many requests', { status: 429 });
- * }
- */
-export function rateLimit(
+export async function rateLimit(
   identifier: string,
-  maxRequests = 5,
-  windowMs = 3600000 // 1 hour default
-): { allowed: boolean; remaining: number; resetTime: number } {
-  const now = Date.now();
-  const record = store[identifier];
-
-  // No record or window expired - create new record
-  if (!record || now > record.resetTime) {
-    const resetTime = now + windowMs;
-    store[identifier] = { count: 1, resetTime };
-    return { allowed: true, remaining: maxRequests - 1, resetTime };
+  endpoint: string,
+  limit: number = 5
+): Promise<{ success: boolean; remaining: number; reset: Date }> {
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is required for rate limiting');
   }
 
-  // Limit exceeded
-  if (record.count >= maxRequests) {
-    return { allowed: false, remaining: 0, resetTime: record.resetTime };
+  const supabase = createClient(
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.SUPABASE_SERVICE_ROLE_KEY
+  );
+
+  const now = new Date();
+  const windowStart = new Date(now.getTime() - ONE_HOUR_MS);
+
+  const { data: existing, error: selectError } = await supabase
+    .from('rate_limits')
+    .select('identifier, endpoint, request_count, window_start')
+    .eq('identifier', identifier)
+    .eq('endpoint', endpoint)
+    .maybeSingle<RateLimitRow>();
+
+  if (selectError) {
+    throw new Error(`Rate limit select failed: ${selectError.message}`);
   }
 
-  // Increment count
-  record.count++;
+  if (!existing) {
+    const { error: insertError } = await supabase.from('rate_limits').insert({
+      identifier,
+      endpoint,
+      request_count: 1,
+      window_start: now.toISOString(),
+    });
+
+    if (insertError) {
+      throw new Error(`Rate limit insert failed: ${insertError.message}`);
+    }
+
+    return {
+      success: true,
+      remaining: limit - 1,
+      reset: new Date(now.getTime() + ONE_HOUR_MS),
+    };
+  }
+
+  const existingWindowStart = new Date(existing.window_start);
+  const windowExpired = existingWindowStart < windowStart;
+
+  if (windowExpired) {
+    const { error: resetError } = await supabase
+      .from('rate_limits')
+      .update({
+        request_count: 1,
+        window_start: now.toISOString(),
+      })
+      .eq('identifier', identifier)
+      .eq('endpoint', endpoint);
+
+    if (resetError) {
+      throw new Error(`Rate limit reset failed: ${resetError.message}`);
+    }
+
+    return {
+      success: true,
+      remaining: limit - 1,
+      reset: new Date(now.getTime() + ONE_HOUR_MS),
+    };
+  }
+
+  if (existing.request_count >= limit) {
+    return {
+      success: false,
+      remaining: 0,
+      reset: new Date(existingWindowStart.getTime() + ONE_HOUR_MS),
+    };
+  }
+
+  const nextCount = existing.request_count + 1;
+  const { error: updateError } = await supabase
+    .from('rate_limits')
+    .update({ request_count: nextCount })
+    .eq('identifier', identifier)
+    .eq('endpoint', endpoint);
+
+  if (updateError) {
+    throw new Error(`Rate limit update failed: ${updateError.message}`);
+  }
+
   return {
-    allowed: true,
-    remaining: maxRequests - record.count,
-    resetTime: record.resetTime,
+    success: true,
+    remaining: Math.max(limit - nextCount, 0),
+    reset: new Date(existingWindowStart.getTime() + ONE_HOUR_MS),
   };
-}
-
-/**
- * Cleanup old rate limit records
- * 
- * Removes expired entries from the store to prevent memory leaks.
- * Should be called periodically (e.g., via setInterval).
- * 
- * @returns {number} Number of records cleaned up
- */
-export function cleanupRateLimitStore(): number {
-  const now = Date.now();
-  let cleaned = 0;
-
-  Object.keys(store).forEach((key) => {
-    if (store[key].resetTime < now) {
-      delete store[key];
-      cleaned++;
-    }
-  });
-
-  return cleaned;
-}
-
-// Automatic cleanup every 10 minutes
-if (typeof setInterval !== 'undefined') {
-  setInterval(() => {
-    const cleaned = cleanupRateLimitStore();
-    if (cleaned > 0) {
-      console.log(`[RateLimit] Cleaned up ${cleaned} expired records`);
-    }
-  }, 600000); // 10 minutes
 }

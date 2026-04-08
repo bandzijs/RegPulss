@@ -91,10 +91,10 @@ export async function POST(request: NextRequest): Promise<NextResponse<Subscribe
                request.headers.get('x-real-ip') || 
                'unknown';
 
-    // Check rate limit: 5 requests per hour per IP
-    const { allowed, remaining, resetTime } = rateLimit(ip, 5, 3600000);
+    // Check rate limit: 5 requests per hour per IP for this endpoint
+    const { success, remaining, reset } = await rateLimit(ip, 'subscribe', 5);
 
-    if (!allowed) {
+    if (!success) {
       return NextResponse.json(
         { error: t.rateLimited },
         { 
@@ -102,8 +102,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<Subscribe
           headers: {
             'X-RateLimit-Limit': '5',
             'X-RateLimit-Remaining': '0',
-            'X-RateLimit-Reset': new Date(resetTime).toISOString(),
-            'Retry-After': String(Math.ceil((resetTime - Date.now()) / 1000)),
+            'X-RateLimit-Reset': reset.toISOString(),
+            'Retry-After': String(Math.ceil((reset.getTime() - Date.now()) / 1000)),
           }
         }
       );
@@ -200,7 +200,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Subscribe
         headers: {
           'X-RateLimit-Limit': '5',
           'X-RateLimit-Remaining': String(remaining),
-          'X-RateLimit-Reset': new Date(resetTime).toISOString(),
+          'X-RateLimit-Reset': reset.toISOString(),
         }
       }
     );
