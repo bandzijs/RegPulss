@@ -25,7 +25,7 @@ export interface EmailEditorHandle {
 
 const DashboardEmailEditor = forwardRef<EmailEditorHandle, EmailEditorProps>(
   function DashboardEmailEditor(
-    { onReady, onExportHtml, initialDesign, minHeight = 700 },
+    { onReady, onExportHtml, initialDesign, minHeight = 750 },
     ref
   ) {
     const editorRef = useRef<EditorRef | null>(null);
@@ -73,13 +73,14 @@ const DashboardEmailEditor = forwardRef<EmailEditorHandle, EmailEditorProps>(
     }));
 
     return (
-      <div className="relative w-full min-h-[500px] rounded-md border border-[var(--color-border)] shadow-sm bg-white overflow-hidden">
+      <div className="relative w-full min-w-full min-h-[500px] rounded-md border border-[var(--color-border)] bg-white shadow-sm overflow-hidden">
         {!isReady ? (
           <div className="absolute inset-0 z-10 rounded-md border border-input bg-muted/30 p-4 animate-pulse" />
         ) : null}
         <EmailEditor
           ref={editorRef}
           minHeight={minHeight}
+          style={{ width: '100%', minWidth: '100%' }}
           options={{
             displayMode: 'email',
             appearance: {

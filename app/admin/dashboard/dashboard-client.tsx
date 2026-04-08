@@ -1095,16 +1095,16 @@ export default function DashboardClient({
           ) : null}
 
           {activeSection === 'newsletter' ? (
-              <div className="grid gap-6 xl:grid-cols-2 mt-4">
-                <Card className="shadow-sm">
+              <div className="mt-4 w-full max-w-none">
+                <Card className="w-full max-w-none shadow-sm">
                   <CardHeader>
                     <CardTitle>Send Newsletter</CardTitle>
                     <CardDescription>
                       Draft and send a bulk message to all subscribers.
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
+                  <CardContent className="w-full space-y-4">
+                    <div className="w-full space-y-2">
                       <label
                         htmlFor="newsletter-subject"
                         className="text-sm text-muted-foreground"
@@ -1113,12 +1113,13 @@ export default function DashboardClient({
                       </label>
                       <Input
                         id="newsletter-subject"
+                        className="w-full"
                         value={subject}
                         onChange={(event) => setSubject(event.target.value)}
                         placeholder="Weekly RegPulss updates"
                       />
                     </div>
-                    <div className="space-y-2">
+                    <div className="w-full space-y-2">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <label
                           htmlFor="newsletter-editor"
@@ -1176,9 +1177,9 @@ export default function DashboardClient({
                             : ''
                         )}
                       >
-                        <div className={cn(isFullscreenEditor ? 'max-w-6xl mx-auto' : '')}>
+                        <div className="w-full">
                           {isFullscreenEditor ? (
-                            <div className="space-y-4 mb-4">
+                            <div className="mb-4 space-y-4">
                               <div className="flex items-center justify-between gap-3">
                                 <p className="text-sm text-muted-foreground">
                                   Fullscreen Email Editor
@@ -1193,6 +1194,7 @@ export default function DashboardClient({
                                 </Button>
                               </div>
                               <Input
+                                className="w-full"
                                 value={subject}
                                 onChange={(event) => setSubject(event.target.value)}
                                 placeholder="Weekly RegPulss updates"
@@ -1274,7 +1276,11 @@ export default function DashboardClient({
                               setIsDesignSaved(false);
                             }}
                             initialDesign={initialDesign}
-                            minHeight={isFullscreenEditor ? 'calc(100vh - 120px)' : 700}
+                            minHeight={
+                              isFullscreenEditor
+                                ? 'calc(100vh - 130px)'
+                                : 750
+                            }
                           />
                         </div>
                       </div>
@@ -1351,17 +1357,6 @@ export default function DashboardClient({
                     />
                   </CardContent>
                 </Card>
-
-                <div>
-                  <Card className="shadow-sm">
-                    <CardHeader>
-                      <CardTitle>Email Preview</CardTitle>
-                      <CardDescription>
-                        Click Preview to open modal preview.
-                      </CardDescription>
-                    </CardHeader>
-                  </Card>
-                </div>
               </div>
           ) : null}
           {showPreview ? (
