@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createClient as createServerClient } from '@/utils/supabase/server';
+import { createServiceRoleSupabaseClient } from '@/utils/supabase/service-role';
 
 function isAdminEmail(email: string | undefined): boolean {
   const allowed = process.env.ADMIN_EMAILS?.split(',') ?? [];
@@ -7,10 +8,10 @@ function isAdminEmail(email: string | undefined): boolean {
 }
 
 export async function GET() {
-  const supabase = createClient();
+  const authClient = createServerClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await authClient.auth.getUser();
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -20,13 +21,24 @@ export async function GET() {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  const supabase = createServiceRoleSupabaseClient();
+  if (!supabase) {
+    console.error(
+      'Drafts GET: missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY'
+    );
+    return NextResponse.json(
+      { error: 'Server configuration error' },
+      { status: 500 }
+    );
+  }
+
   const { data, error } = await supabase
     .from('newsletters')
     .select('*')
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Failed to fetch newsletters:', error);
+    console.error('Failed to fetch newsletters:', JSON.stringify(error));
     return NextResponse.json(
       { error: 'Failed to load drafts' },
       { status: 500 }
@@ -42,14 +54,13 @@ interface CreateDraftBody {
   html_content?: string;
   json_content?: unknown;
   source_urls?: string[];
-  status?: string;
 }
 
 export async function POST(request: Request) {
-  const supabase = createClient();
+  const authClient = createServerClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await authClient.auth.getUser();
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -67,12 +78,12 @@ export async function POST(request: Request) {
   }
 
   const subject = body.subject?.trim() ?? '';
-  const html_content = body.html_content?.trim() ?? '';
+  const htmlTrimmed = body.html_content?.trim() ?? '';
   const title =
     body.title?.trim() ||
     (subject ? subject.slice(0, 120) : 'Untitled draft');
 
-  if (!html_content) {
+  if (!htmlTrimmed) {
     return NextResponse.json(
       { error: 'html_content is required' },
       { status: 400 }
@@ -88,27 +99,33 @@ export async function POST(request: Request) {
     ? body.source_urls
     : [];
 
-  const status = body.status === 'sent' ? 'sent' : 'draft';
+  const supabase = createServiceRoleSupabaseClient();
+  if (!supabase) {
+    console.error(
+      'Drafts POST: missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY'
+    );
+    return NextResponse.json(
+      { error: 'Server configuration error' },
+      { status: 500 }
+    );
+  }
 
   const { data, error } = await supabase
     .from('newsletters')
     .insert({
       title,
       subject,
-      html_content,
-      json_content,
-      source_urls,
-      status,
+      html_content: htmlTrimmed || null,
+      json_content: json_content || null,
+      source_urls: source_urls || [],
+      status: 'draft',
     })
     .select()
     .single();
 
   if (error) {
-    console.error('Failed to create draft:', error);
-    return NextResponse.json(
-      { error: 'Failed to save draft' },
-      { status: 500 }
-    );
+    console.error('Supabase draft insert error:', JSON.stringify(error));
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   return NextResponse.json({ draft: data });

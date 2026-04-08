@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createClient as createServerClient } from '@/utils/supabase/server';
+import { createServiceRoleSupabaseClient } from '@/utils/supabase/service-role';
 
 function isAdminEmail(email: string | undefined): boolean {
   const allowed = process.env.ADMIN_EMAILS?.split(',') ?? [];
@@ -21,10 +22,10 @@ export async function GET(
   context: { params: { id: string } }
 ) {
   const { id } = context.params;
-  const supabase = createClient();
+  const authClient = createServerClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await authClient.auth.getUser();
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -34,6 +35,17 @@ export async function GET(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  const supabase = createServiceRoleSupabaseClient();
+  if (!supabase) {
+    console.error(
+      'Draft GET [id]: missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY'
+    );
+    return NextResponse.json(
+      { error: 'Server configuration error' },
+      { status: 500 }
+    );
+  }
+
   const { data, error } = await supabase
     .from('newsletters')
     .select('*')
@@ -41,7 +53,7 @@ export async function GET(
     .maybeSingle();
 
   if (error) {
-    console.error('Failed to fetch draft:', error);
+    console.error('Failed to fetch draft:', JSON.stringify(error));
     return NextResponse.json({ error: 'Failed to load draft' }, { status: 500 });
   }
 
@@ -57,10 +69,10 @@ export async function PATCH(
   context: { params: { id: string } }
 ) {
   const { id } = context.params;
-  const supabase = createClient();
+  const authClient = createServerClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await authClient.auth.getUser();
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -105,6 +117,17 @@ export async function PATCH(
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
   }
 
+  const supabase = createServiceRoleSupabaseClient();
+  if (!supabase) {
+    console.error(
+      'Draft PATCH [id]: missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY'
+    );
+    return NextResponse.json(
+      { error: 'Server configuration error' },
+      { status: 500 }
+    );
+  }
+
   const { data, error } = await supabase
     .from('newsletters')
     .update(patch)
@@ -113,8 +136,8 @@ export async function PATCH(
     .single();
 
   if (error) {
-    console.error('Failed to update draft:', error);
-    return NextResponse.json({ error: 'Failed to update draft' }, { status: 500 });
+    console.error('Failed to update draft:', JSON.stringify(error));
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   if (!data) {
@@ -129,10 +152,10 @@ export async function DELETE(
   context: { params: { id: string } }
 ) {
   const { id } = context.params;
-  const supabase = createClient();
+  const authClient = createServerClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await authClient.auth.getUser();
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -142,11 +165,22 @@ export async function DELETE(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  const supabase = createServiceRoleSupabaseClient();
+  if (!supabase) {
+    console.error(
+      'Draft DELETE [id]: missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY'
+    );
+    return NextResponse.json(
+      { error: 'Server configuration error' },
+      { status: 500 }
+    );
+  }
+
   const { error } = await supabase.from('newsletters').delete().eq('id', id);
 
   if (error) {
-    console.error('Failed to delete draft:', error);
-    return NextResponse.json({ error: 'Failed to delete draft' }, { status: 500 });
+    console.error('Failed to delete draft:', JSON.stringify(error));
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });
