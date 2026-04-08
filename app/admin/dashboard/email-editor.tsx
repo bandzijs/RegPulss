@@ -14,6 +14,7 @@ export interface EmailEditorProps {
   onReady: () => void;
   onExportHtml: (html: string) => void;
   initialDesign?: object;
+  minHeight?: number | string;
 }
 
 export interface EmailEditorHandle {
@@ -22,7 +23,10 @@ export interface EmailEditorHandle {
 }
 
 const DashboardEmailEditor = forwardRef<EmailEditorHandle, EmailEditorProps>(
-  function DashboardEmailEditor({ onReady, onExportHtml, initialDesign }, ref) {
+  function DashboardEmailEditor(
+    { onReady, onExportHtml, initialDesign, minHeight = 700 },
+    ref
+  ) {
     const editorRef = useRef<EditorRef | null>(null);
     const [isReady, setIsReady] = useState(false);
 
@@ -61,13 +65,43 @@ const DashboardEmailEditor = forwardRef<EmailEditorHandle, EmailEditorProps>(
     }));
 
     return (
-      <div className="relative w-full min-h-[600px]">
+      <div className="relative w-full min-h-[500px] rounded-md border border-[var(--color-border)] shadow-sm bg-white overflow-hidden">
         {!isReady ? (
           <div className="absolute inset-0 z-10 rounded-md border border-input bg-muted/30 p-4 animate-pulse" />
         ) : null}
         <EmailEditor
           ref={editorRef}
-          minHeight={600}
+          minHeight={minHeight}
+          options={{
+            displayMode: 'email',
+            appearance: {
+              theme: 'light',
+              panels: {
+                tools: { dock: 'left' },
+              },
+            },
+            features: {
+              textEditor: {
+                spellChecker: true,
+                tables: true,
+              },
+            },
+            fonts: {
+              showDefaultFonts: true,
+              customFonts: [
+                {
+                  label: 'Inter',
+                  value: "'Inter', sans-serif",
+                  url: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap',
+                },
+                {
+                  label: 'Libre Baskerville',
+                  value: "'Libre Baskerville', serif",
+                  url: 'https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&display=swap',
+                },
+              ],
+            },
+          }}
           onReady={() => {
             setIsReady(true);
             onReady();

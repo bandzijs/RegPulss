@@ -9,7 +9,17 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { BarChart3, Bolt, Mail, Settings, Users } from 'lucide-react';
+import {
+  BarChart3,
+  Bolt,
+  Expand,
+  Mail,
+  Monitor,
+  Settings,
+  Smartphone,
+  Users,
+  X,
+} from 'lucide-react';
 import AdminLogoutButton from './logout-button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -129,6 +139,7 @@ const navItems = [
 ];
 
 const NEWSLETTER_DESIGN_KEY = 'regpulss-newsletter-design';
+type PreviewViewport = 'desktop' | 'mobile';
 
 function sidebarInitials(email: string): string {
   return email.slice(0, 2).toUpperCase();
@@ -154,8 +165,11 @@ export default function DashboardClient({
   const [body, setBody] = useState('');
   const [previewHtml, setPreviewHtml] = useState('');
   const [showPreview, setShowPreview] = useState(false);
+  const [previewViewport, setPreviewViewport] = useState<PreviewViewport>('desktop');
   const [editorReady, setEditorReady] = useState(false);
   const [initialDesign, setInitialDesign] = useState<object | undefined>(undefined);
+  const [isFullscreenEditor, setIsFullscreenEditor] = useState(false);
+  const [isDesignSaved, setIsDesignSaved] = useState(false);
   const [sendState, setSendState] = useState<{
     status: 'idle' | 'loading' | 'success' | 'error';
     message: string;
@@ -177,6 +191,17 @@ export default function DashboardClient({
     [subscribers]
   );
   const trend = useMemo(() => getTrend(growthData), [growthData]);
+  const emailBodyStats = useMemo(() => {
+    const text = previewHtml
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const characters = text.length;
+    const words = text ? text.split(' ').length : 0;
+    return { words, characters };
+  }, [previewHtml]);
 
   async function handlePreviewNewsletter() {
     if (!subject.trim()) {
@@ -220,6 +245,7 @@ export default function DashboardClient({
       }
 
       window.localStorage.setItem(NEWSLETTER_DESIGN_KEY, JSON.stringify(design));
+      setIsDesignSaved(true);
       setSendState({
         status: 'success',
         message: 'Design saved locally.',
@@ -246,6 +272,7 @@ export default function DashboardClient({
 
       const parsed = JSON.parse(raw) as object;
       setInitialDesign(parsed);
+      setIsDesignSaved(true);
       setSendState({
         status: 'success',
         message: 'Saved design loaded.',
@@ -550,31 +577,146 @@ export default function DashboardClient({
                       />
                     </div>
                     <div className="space-y-2">
-                      <label
-                        htmlFor="newsletter-editor"
-                        className="text-sm text-muted-foreground"
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <label
+                          htmlFor="newsletter-editor"
+                          className="text-sm text-muted-foreground"
+                        >
+                          Email body
+                        </label>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsFullscreenEditor((value) => !value)}
+                            disabled={!editorReady}
+                          >
+                            {isFullscreenEditor ? (
+                              <>
+                                <X className="mr-1 h-4 w-4" />
+                                Exit Fullscreen
+                              </>
+                            ) : (
+                              <>
+                                <Expand className="mr-1 h-4 w-4" />
+                                Fullscreen
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handlePreviewNewsletter}
+                            disabled={!editorReady || sendState.status === 'loading'}
+                          >
+                            Preview
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleSaveDesign}
+                            disabled={!editorReady || sendState.status === 'loading'}
+                          >
+                            Save Design
+                            <span
+                              className={cn(
+                                'ml-2 h-2 w-2 rounded-full',
+                                isDesignSaved ? 'bg-emerald-500' : 'bg-gray-400'
+                              )}
+                            />
+                          </Button>
+                        </div>
+                      </div>
+                      <div
+                        className={cn(
+                          isFullscreenEditor
+                            ? 'fixed inset-0 z-50 bg-white p-4 md:p-6 overflow-y-auto'
+                            : ''
+                        )}
                       >
-                        Email body
-                      </label>
-                      <DashboardEmailEditor
-                        ref={emailEditorRef}
-                        onReady={() => setEditorReady(true)}
-                        onExportHtml={(html) => {
-                          setPreviewHtml(html);
-                          setBody(html);
-                        }}
-                        initialDesign={initialDesign}
-                      />
+                        <div className={cn(isFullscreenEditor ? 'max-w-6xl mx-auto' : '')}>
+                          {isFullscreenEditor ? (
+                            <div className="space-y-4 mb-4">
+                              <div className="flex items-center justify-between gap-3">
+                                <p className="text-sm text-muted-foreground">
+                                  Fullscreen Email Editor
+                                </p>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => setIsFullscreenEditor(false)}
+                                >
+                                  <X className="mr-1 h-4 w-4" />
+                                  Close
+                                </Button>
+                              </div>
+                              <Input
+                                value={subject}
+                                onChange={(event) => setSubject(event.target.value)}
+                                placeholder="Weekly RegPulss updates"
+                              />
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={handleSaveDesign}
+                                  disabled={!editorReady || sendState.status === 'loading'}
+                                >
+                                  Save Design
+                                  <span
+                                    className={cn(
+                                      'ml-2 h-2 w-2 rounded-full',
+                                      isDesignSaved ? 'bg-emerald-500' : 'bg-gray-400'
+                                    )}
+                                  />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={handleLoadDesign}
+                                  disabled={!editorReady || sendState.status === 'loading'}
+                                >
+                                  Load Design
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={handlePreviewNewsletter}
+                                  disabled={!editorReady || sendState.status === 'loading'}
+                                >
+                                  Preview
+                                </Button>
+                                <Button
+                                  type="button"
+                                  onClick={handleSendNewsletter}
+                                  disabled={!editorReady || sendState.status === 'loading'}
+                                  className="bg-[#E53E3E] text-white hover:bg-[#c53030]"
+                                >
+                                  {sendState.status === 'loading'
+                                    ? 'Sending...'
+                                    : 'Send Newsletter'}
+                                </Button>
+                              </div>
+                            </div>
+                          ) : null}
+                          <DashboardEmailEditor
+                            ref={emailEditorRef}
+                            onReady={() => setEditorReady(true)}
+                            onExportHtml={(html) => {
+                              setPreviewHtml(html);
+                              setBody(html);
+                              setIsDesignSaved(false);
+                            }}
+                            initialDesign={initialDesign}
+                            minHeight={isFullscreenEditor ? 'calc(100vh - 120px)' : 700}
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {emailBodyStats.words} words • {emailBodyStats.characters} characters
+                      </p>
                     </div>
                     <div className="flex flex-wrap gap-3">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleSaveDesign}
-                        disabled={!editorReady || sendState.status === 'loading'}
-                      >
-                        Save Design
-                      </Button>
                       <Button
                         type="button"
                         variant="outline"
@@ -582,14 +724,6 @@ export default function DashboardClient({
                         disabled={!editorReady || sendState.status === 'loading'}
                       >
                         Load Design
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handlePreviewNewsletter}
-                        disabled={!editorReady || sendState.status === 'loading'}
-                      >
-                        Preview
                       </Button>
                       <Button
                         type="button"
@@ -616,22 +750,58 @@ export default function DashboardClient({
                 </Card>
 
                 <div>
-                  {showPreview ? (
-                    renderPreview(subject, previewHtml)
-                  ) : (
-                    <Card className="shadow-sm">
-                      <CardHeader>
-                        <CardTitle>Email Preview</CardTitle>
-                        <CardDescription>
-                          Click Preview to render the message.
-                        </CardDescription>
-                      </CardHeader>
-                    </Card>
-                  )}
+                  <Card className="shadow-sm">
+                    <CardHeader>
+                      <CardTitle>Email Preview</CardTitle>
+                      <CardDescription>
+                        Click Preview to open modal preview.
+                      </CardDescription>
+                    </CardHeader>
+                  </Card>
                 </div>
               </div>
             </TabsContent>
           </Tabs>
+          {showPreview ? (
+            <div className="fixed inset-0 z-50 bg-black/50 p-4 md:p-8 overflow-y-auto">
+              <div className="mx-auto max-w-5xl rounded-lg bg-white p-4 shadow-xl">
+                <div className="mb-4 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant={previewViewport === 'desktop' ? 'default' : 'outline'}
+                      onClick={() => setPreviewViewport('desktop')}
+                    >
+                      <Monitor className="mr-1 h-4 w-4" />
+                      Desktop
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={previewViewport === 'mobile' ? 'default' : 'outline'}
+                      onClick={() => setPreviewViewport('mobile')}
+                    >
+                      <Smartphone className="mr-1 h-4 w-4" />
+                      Mobile
+                    </Button>
+                  </div>
+                  <Button type="button" variant="outline" onClick={() => setShowPreview(false)}>
+                    <X className="mr-1 h-4 w-4" />
+                    Close
+                  </Button>
+                </div>
+                <div className="flex justify-center">
+                  <div
+                    className={cn(
+                      'rounded-md border border-[var(--color-border)] bg-white shadow-sm',
+                      previewViewport === 'desktop' ? 'w-[600px]' : 'w-[375px]'
+                    )}
+                  >
+                    {renderPreview(subject, previewHtml)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </section>
       </div>
     </main>
