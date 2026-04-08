@@ -15,15 +15,12 @@ const sans =
   "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif";
 const serif = "Georgia, 'Times New Roman', Times, serif";
 
-export type ConfirmationEmailProps = {
-  confirmUrl: string;
-  unsubscribeUrl: string;
-};
+export interface ConfirmationProps {
+  email: string;
+  confirmationUrl: string;
+}
 
-function ConfirmationEmail({
-  confirmUrl,
-  unsubscribeUrl,
-}: ConfirmationEmailProps) {
+export function Confirmation({ email, confirmationUrl }: ConfirmationProps) {
   return (
     <Html>
       <Head />
@@ -74,7 +71,7 @@ function ConfirmationEmail({
             </Text>
             <Text
               style={{
-                margin: '0 0 40px 0',
+                margin: '0 0 18px 0',
                 fontFamily: sans,
                 fontSize: '15px',
                 lineHeight: 1.7,
@@ -88,9 +85,21 @@ function ConfirmationEmail({
               Thank you for subscribing. Please confirm your email address by
               clicking the button below.
             </Text>
+            <Text
+              style={{
+                margin: '0 0 28px 0',
+                fontFamily: sans,
+                fontSize: '14px',
+                lineHeight: 1.6,
+                color: '#666666',
+                textAlign: 'center',
+              }}
+            >
+              {email}
+            </Text>
             <Section style={{ textAlign: 'center', paddingBottom: '48px' }}>
               <Button
-                href={String(confirmUrl)}
+                href={String(confirmationUrl)}
                 style={{
                   display: 'inline-block',
                   backgroundColor: '#1a1a1a',
@@ -121,36 +130,10 @@ function ConfirmationEmail({
               browser:
               <br />
               <Link
-                href={String(confirmUrl)}
+                href={String(confirmationUrl)}
                 style={{ color: '#DC2626', textDecoration: 'underline' }}
               >
-                {confirmUrl}
-              </Link>
-            </Text>
-          </Section>
-
-          <Section
-            style={{
-              backgroundColor: '#f5f5f5',
-              padding: '28px 32px',
-              textAlign: 'center',
-            }}
-          >
-            <Text
-              style={{
-                margin: 0,
-                fontFamily: sans,
-                fontSize: '12px',
-                lineHeight: 1.65,
-                color: '#737373',
-              }}
-            >
-              {"Don't want these emails? "}
-              <Link
-                href={String(unsubscribeUrl)}
-                style={{ color: '#737373', textDecoration: 'underline' }}
-              >
-                Unsubscribe
+                {confirmationUrl}
               </Link>
             </Text>
           </Section>
@@ -160,5 +143,4 @@ function ConfirmationEmail({
   );
 }
 
-export default ConfirmationEmail;
-export { ConfirmationEmail };
+export default Confirmation;

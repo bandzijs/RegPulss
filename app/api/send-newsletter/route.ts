@@ -1,40 +1,14 @@
 import { NextResponse } from 'next/server';
+import { render } from '@react-email/render';
 import { Resend } from 'resend';
 import { createClient } from '@/utils/supabase/server';
+import { Newsletter } from '@/emails/newsletter';
+import React from 'react';
 
 interface NewsletterRequestBody {
   subject: string;
-  body: string;
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function buildNewsletterHtml(subject: string, body: string): string {
-  const safeSubject = escapeHtml(subject);
-  const safeBody = escapeHtml(body).replace(/\n/g, '<br />');
-
-  return `
-    <div style="margin:0;padding:0;background:#ffffff;font-family:Inter,Arial,sans-serif;color:#1a1a1a;">
-      <div style="max-width:600px;margin:0 auto;padding:32px 20px;">
-        <p style="margin:0 0 8px 0;font-size:12px;color:#666666;letter-spacing:0.08em;text-transform:uppercase;">
-          RegPulss
-        </p>
-        <h1 style="margin:0 0 18px 0;font-size:30px;line-height:1.2;font-family:Georgia,'Times New Roman',serif;color:#1a1a1a;">
-          ${safeSubject}
-        </h1>
-        <div style="font-size:16px;line-height:1.7;color:#1a1a1a;">
-          ${safeBody}
-        </div>
-      </div>
-    </div>
-  `;
+  body?: string;
+  html?: string;
 }
 
 function chunkEmails(emails: string[], size: number): string[][] {
@@ -78,10 +52,11 @@ export async function POST(request: Request) {
 
   const subject = payload.subject?.trim();
   const body = payload.body?.trim();
+  const htmlFromRequest = payload.html?.trim();
 
-  if (!subject || !body) {
+  if (!subject || (!body && !htmlFromRequest)) {
     return NextResponse.json(
-      { success: false, error: 'Subject and body are required' },
+      { success: false, error: 'Subject and email content are required' },
       { status: 400 }
     );
   }
@@ -113,7 +88,9 @@ export async function POST(request: Request) {
 
   const resend = new Resend(resendApiKey);
   const emailChunks = chunkEmails(emails, 50);
-  const html = buildNewsletterHtml(subject, body);
+  const html = htmlFromRequest
+    ? htmlFromRequest
+    : await render(React.createElement(Newsletter, { subject, body: body ?? '' }));
 
   try {
     for (const to of emailChunks) {

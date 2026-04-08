@@ -8,30 +8,14 @@ import {
   Section,
   Text,
   Hr,
-  Link,
 } from '@react-email/components';
 
-export type NewsletterItem = {
-  title: string;
-  summary: string;
-  sourceUrl: string;
-};
+export interface NewsletterProps {
+  subject: string;
+  body: string;
+}
 
-export type NewsletterEmailProps = {
-  issueNumber: number;
-  date: string;
-  intro: string;
-  items: NewsletterItem[];
-  unsubscribeUrl: string;
-};
-
-export default function NewsletterEmail({
-  issueNumber,
-  date,
-  intro,
-  items,
-  unsubscribeUrl,
-}: NewsletterEmailProps) {
+export function Newsletter({ subject, body }: NewsletterProps) {
   return (
     <Html>
       <Head />
@@ -78,7 +62,19 @@ export default function NewsletterEmail({
                 marginBottom: '18px',
               }}
             >
-              Issue #{issueNumber} • {date}
+              Regulatory newsletter
+            </Text>
+
+            <Text
+              style={{
+                fontSize: '22px',
+                lineHeight: '1.35',
+                color: '#ffffff',
+                marginBottom: '14px',
+                fontWeight: 700,
+              }}
+            >
+              {subject}
             </Text>
 
             <Text
@@ -87,59 +83,11 @@ export default function NewsletterEmail({
                 lineHeight: '1.65',
                 color: '#d1d5db',
                 marginBottom: '18px',
+                whiteSpace: 'pre-wrap',
               }}
             >
-              {intro}
+              {body}
             </Text>
-
-            <Hr style={{ borderColor: 'rgba(229,231,235,0.14)', margin: '18px 0' }} />
-
-            {items.map((item, idx) => (
-              <Section
-                key={`${item.title}-${idx}`}
-                style={{
-                  padding: '14px 0',
-                  borderBottom:
-                    idx === items.length - 1
-                      ? 'none'
-                      : '1px solid rgba(229,231,235,0.08)',
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: '14px',
-                    fontWeight: 700,
-                    color: '#ffffff',
-                    marginBottom: '6px',
-                  }}
-                >
-                  {item.title}
-                </Text>
-
-                <Text
-                  style={{
-                    fontSize: '13px',
-                    lineHeight: '1.6',
-                    color: '#d1d5db',
-                    marginBottom: '8px',
-                  }}
-                >
-                  {item.summary}
-                </Text>
-
-                <Text style={{ fontSize: '13px', margin: 0 }}>
-                  <Link
-                    href={item.sourceUrl}
-                    style={{
-                      color: '#93c5fd',
-                      textDecoration: 'underline',
-                    }}
-                  >
-                    Read source
-                  </Link>
-                </Text>
-              </Section>
-            ))}
 
             <Hr style={{ borderColor: 'rgba(229,231,235,0.14)', margin: '18px 0' }} />
 
@@ -151,13 +99,7 @@ export default function NewsletterEmail({
                 lineHeight: '1.6',
               }}
             >
-              <a
-                href={unsubscribeUrl}
-                style={{ color: '#9ca3af', textDecoration: 'underline' }}
-              >
-                Unsubscribe
-              </a>{' '}
-              • RegPulss — Regulatory updates for Latvia
+              RegPulss — Regulatory updates for Latvia
             </Text>
           </Section>
         </Container>
@@ -166,23 +108,10 @@ export default function NewsletterEmail({
   );
 }
 
-NewsletterEmail.PreviewProps = {
-  issueNumber: 1,
-  date: "March 25, 2026",
-  intro: "This week in Latvian regulatory updates...",
-  items: [
-    {
-      title: "New amendments to Labour Law",
-      summary:
-        "The Saeima passed amendments affecting overtime regulations for employees.",
-      sourceUrl: "https://likumi.lv",
-    },
-    {
-      title: "EU directive on data privacy updated",
-      summary: "EUR-Lex published updates to GDPR enforcement guidelines.",
-      sourceUrl: "https://eur-lex.europa.eu",
-    },
-  ],
-  unsubscribeUrl: "https://regpulss.lv/api/unsubscribe?token=preview",
+Newsletter.PreviewProps = {
+  subject: 'Weekly RegPulss Updates',
+  body:
+    'This week in Latvian regulatory updates...\n\n- New amendments to Labour Law\n- EU directive on data privacy updated',
 };
 
+export default Newsletter;

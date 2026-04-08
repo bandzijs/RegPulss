@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   Area,
   AreaChart,
@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import DashboardEmailEditor, { type EmailEditorHandle } from './email-editor';
 
 interface Subscriber {
   id: string;
@@ -81,7 +82,7 @@ function createGrowthSeries(subscribers: Subscriber[]): GrowthPoint[] {
   });
 }
 
-function renderPreview(subject: string, body: string) {
+function renderPreview(subject: string, html: string) {
   return (
     <Card className="bg-[#fdfcf9] border-[var(--color-border)] shadow-sm">
       <CardHeader className="pb-3">
@@ -93,9 +94,11 @@ function renderPreview(subject: string, body: string) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="text-sm leading-7 text-[var(--color-text-primary)] whitespace-pre-wrap">
-          {body || '(No content)'}
-        </div>
+        <iframe
+          title="Newsletter preview"
+          className="w-full min-h-[600px] rounded-md border border-[var(--color-border)] bg-white"
+          srcDoc={html}
+        />
       </CardContent>
     </Card>
   );
@@ -125,6 +128,8 @@ const navItems = [
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
+const NEWSLETTER_DESIGN_KEY = 'regpulss-newsletter-design';
+
 function sidebarInitials(email: string): string {
   return email.slice(0, 2).toUpperCase();
 }
@@ -147,11 +152,15 @@ export default function DashboardClient({
   const [query, setQuery] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
+  const [previewHtml, setPreviewHtml] = useState('');
   const [showPreview, setShowPreview] = useState(false);
+  const [editorReady, setEditorReady] = useState(false);
+  const [initialDesign, setInitialDesign] = useState<object | undefined>(undefined);
   const [sendState, setSendState] = useState<{
     status: 'idle' | 'loading' | 'success' | 'error';
     message: string;
   }>({ status: 'idle', message: '' });
+  const emailEditorRef = useRef<EmailEditorHandle | null>(null);
 
   const filteredSubscribers = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -169,11 +178,113 @@ export default function DashboardClient({
   );
   const trend = useMemo(() => getTrend(growthData), [growthData]);
 
-  async function handleSendNewsletter() {
-    if (!subject.trim() || !body.trim()) {
+  async function handlePreviewNewsletter() {
+    if (!subject.trim()) {
       setSendState({
         status: 'error',
-        message: 'Subject and content are required.',
+        message: 'Subject is required.',
+      });
+      return;
+    }
+
+    try {
+      const html = await emailEditorRef.current?.getHtml();
+      if (!html) {
+        setSendState({
+          status: 'error',
+          message: 'Email editor is not ready yet.',
+        });
+        return;
+      }
+      setPreviewHtml(html);
+      setShowPreview(true);
+      setSendState({ status: 'idle', message: '' });
+    } catch (error) {
+      console.error('Preview export failed:', error);
+      setSendState({
+        status: 'error',
+        message: 'Failed to generate preview from the email editor.',
+      });
+    }
+  }
+
+  async function handleSaveDesign() {
+    try {
+      const design = await emailEditorRef.current?.getJson();
+      if (!design) {
+        setSendState({
+          status: 'error',
+          message: 'Email editor is not ready yet.',
+        });
+        return;
+      }
+
+      window.localStorage.setItem(NEWSLETTER_DESIGN_KEY, JSON.stringify(design));
+      setSendState({
+        status: 'success',
+        message: 'Design saved locally.',
+      });
+    } catch (error) {
+      console.error('Save design failed:', error);
+      setSendState({
+        status: 'error',
+        message: 'Failed to save design.',
+      });
+    }
+  }
+
+  function handleLoadDesign() {
+    try {
+      const raw = window.localStorage.getItem(NEWSLETTER_DESIGN_KEY);
+      if (!raw) {
+        setSendState({
+          status: 'error',
+          message: 'No saved design found in local storage.',
+        });
+        return;
+      }
+
+      const parsed = JSON.parse(raw) as object;
+      setInitialDesign(parsed);
+      setSendState({
+        status: 'success',
+        message: 'Saved design loaded.',
+      });
+    } catch (error) {
+      console.error('Load design failed:', error);
+      setSendState({
+        status: 'error',
+        message: 'Failed to load saved design.',
+      });
+    }
+  }
+
+  async function handleSendNewsletter() {
+    if (!subject.trim()) {
+      setSendState({
+        status: 'error',
+        message: 'Subject is required.',
+      });
+      return;
+    }
+
+    let html = '';
+    try {
+      const exported = await emailEditorRef.current?.getHtml();
+      html = exported ?? '';
+    } catch (error) {
+      console.error('Send export failed:', error);
+      setSendState({
+        status: 'error',
+        message: 'Failed to export HTML from the email editor.',
+      });
+      return;
+    }
+
+    if (!html.trim()) {
+      setSendState({
+        status: 'error',
+        message: 'Email content is empty.',
       });
       return;
     }
@@ -187,6 +298,7 @@ export default function DashboardClient({
         body: JSON.stringify({
           subject: subject.trim(),
           body: body.trim(),
+          html,
         }),
       });
 
@@ -206,6 +318,7 @@ export default function DashboardClient({
       }
 
       setSendState({ status: 'success', message: payload.message });
+      setPreviewHtml(html);
     } catch (error) {
       console.error('Newsletter send failed:', error);
       setSendState({
@@ -438,34 +551,53 @@ export default function DashboardClient({
                     </div>
                     <div className="space-y-2">
                       <label
-                        htmlFor="newsletter-body"
+                        htmlFor="newsletter-editor"
                         className="text-sm text-muted-foreground"
                       >
                         Email body
                       </label>
-                      <textarea
-                        id="newsletter-body"
-                        value={body}
-                        onChange={(event) => setBody(event.target.value)}
-                        className="flex min-h-56 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        placeholder="Write your newsletter..."
+                      <DashboardEmailEditor
+                        ref={emailEditorRef}
+                        onReady={() => setEditorReady(true)}
+                        onExportHtml={(html) => {
+                          setPreviewHtml(html);
+                          setBody(html);
+                        }}
+                        initialDesign={initialDesign}
                       />
                     </div>
                     <div className="flex flex-wrap gap-3">
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={() => setShowPreview((value) => !value)}
+                        onClick={handleSaveDesign}
+                        disabled={!editorReady || sendState.status === 'loading'}
                       >
-                        {showPreview ? 'Hide Preview' : 'Preview'}
+                        Save Design
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleLoadDesign}
+                        disabled={!editorReady || sendState.status === 'loading'}
+                      >
+                        Load Design
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handlePreviewNewsletter}
+                        disabled={!editorReady || sendState.status === 'loading'}
+                      >
+                        Preview
                       </Button>
                       <Button
                         type="button"
                         onClick={handleSendNewsletter}
-                        disabled={sendState.status === 'loading'}
+                        disabled={!editorReady || sendState.status === 'loading'}
                         className="bg-[#E53E3E] text-white hover:bg-[#c53030]"
                       >
-                        {sendState.status === 'loading' ? 'Sending...' : 'Send'}
+                        {sendState.status === 'loading' ? 'Sending...' : 'Send Newsletter'}
                       </Button>
                     </div>
                     {sendState.status !== 'idle' ? (
@@ -485,7 +617,7 @@ export default function DashboardClient({
 
                 <div>
                   {showPreview ? (
-                    renderPreview(subject, body)
+                    renderPreview(subject, previewHtml)
                   ) : (
                     <Card className="shadow-sm">
                       <CardHeader>
