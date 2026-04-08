@@ -10,6 +10,7 @@ import type { Locale } from '@/lib/i18n/types';
 interface ConfirmationPayload {
   email?: string;
   confirmationToken?: string;
+  unsubscribeToken?: string;
   locale?: Locale;
 }
 
@@ -44,6 +45,7 @@ export async function POST(request: Request) {
 
   const email = payload.email?.trim();
   const confirmationToken = payload.confirmationToken?.trim();
+  const unsubscribeToken = payload.unsubscribeToken?.trim();
   const locale: Locale = isLocale(payload.locale) ? payload.locale : 'en';
   console.log('send-confirmation locale:', locale);
 
@@ -54,11 +56,15 @@ export async function POST(request: Request) {
     );
   }
 
-  const confirmationUrl = `${env.NEXT_PUBLIC_SITE_URL}/confirm?token=${confirmationToken}`;
+  const confirmationUrl = `${env.NEXT_PUBLIC_SITE_URL}/confirm?token=${encodeURIComponent(confirmationToken)}`;
+  const unsubscribeUrl = unsubscribeToken
+    ? `${env.NEXT_PUBLIC_SITE_URL}/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}`
+    : `${env.NEXT_PUBLIC_SITE_URL}/unsubscribe`;
   const html = await render(
     React.createElement(Confirmation, {
       email,
       confirmationUrl,
+      unsubscribeUrl,
       locale,
     })
   );

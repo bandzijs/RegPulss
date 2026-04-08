@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
 
   const confirmationUrl = `${SITE_URL}/confirm?token=${encodeURIComponent(confirmationToken)}`;
   const unsubscribeUrl = unsubscribeToken
-    ? `${SITE_URL}/api/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}`
+    ? `${SITE_URL}/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}`
     : confirmationUrl;
   const html = buildConfirmationHtml(email, confirmationUrl, unsubscribeUrl, locale);
   const subject = translations[locale].subject;

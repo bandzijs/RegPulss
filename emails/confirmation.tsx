@@ -19,6 +19,8 @@ const serif = "Georgia, 'Times New Roman', Times, serif";
 export interface ConfirmationProps {
   email: string;
   confirmationUrl: string;
+  /** Public page URL: /unsubscribe?token=… */
+  unsubscribeUrl: string;
   locale?: Locale;
 }
 
@@ -43,7 +45,12 @@ const content = {
   },
 } as const;
 
-export function Confirmation({ email, confirmationUrl, locale = 'en' }: ConfirmationProps) {
+export function Confirmation({
+  email,
+  confirmationUrl,
+  unsubscribeUrl,
+  locale = 'en',
+}: ConfirmationProps) {
   const t = content[locale];
   return (
     <Html>
@@ -170,7 +177,7 @@ export function Confirmation({ email, confirmationUrl, locale = 'en' }: Confirma
             >
               {t.unsubscribe}{' '}
               <Link
-                href={String(confirmationUrl)}
+                href={String(unsubscribeUrl)}
                 style={{ color: '#DC2626', textDecoration: 'underline' }}
               >
                 {t.unsubscribeLink}
