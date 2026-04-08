@@ -45,6 +45,7 @@ export async function POST(request: Request) {
   const email = payload.email?.trim();
   const confirmationToken = payload.confirmationToken?.trim();
   const locale: Locale = isLocale(payload.locale) ? payload.locale : 'en';
+  console.log('send-confirmation locale:', locale);
 
   if (!email || !confirmationToken) {
     return NextResponse.json(

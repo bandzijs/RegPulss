@@ -41,7 +41,7 @@ export default async function Home() {
           <ConfirmationToast />
         </Suspense>
         <Header locale={locale} dict={{ nav: dict.nav, language: dict.language }} />
-        <HeroSection dict={{ hero: dict.hero, subscribe: dict.subscribe }} />
+        <HeroSection locale={locale} dict={{ hero: dict.hero, subscribe: dict.subscribe }} />
         <TrustSection dict={{ trust: dict.trust }} />
         <BenefitsSection dict={{ benefits: dict.benefits }} />
         <Footer dict={{ footer: dict.footer }} />

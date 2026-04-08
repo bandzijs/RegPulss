@@ -13,13 +13,14 @@
  * @returns {ReactElement} Hero section with form and mockup
  */
 import SubscribeForm from '@/app/components/SubscribeForm';
-import type { Dictionary } from '@/lib/i18n/types';
+import type { Dictionary, Locale } from '@/lib/i18n/types';
 
 interface HeroSectionProps {
   dict: Pick<Dictionary, 'hero' | 'subscribe'>;
+  locale: Locale;
 }
 
-export default function HeroSection({ dict }: HeroSectionProps) {
+export default function HeroSection({ dict, locale }: HeroSectionProps) {
   const { hero, subscribe } = dict;
 
   return (
@@ -30,7 +31,7 @@ export default function HeroSection({ dict }: HeroSectionProps) {
             <h1 className="hero-title">{hero.title}</h1>
             <p className="hero-description">{hero.description}</p>
 
-            <SubscribeForm messages={subscribe} />
+            <SubscribeForm messages={subscribe} locale={locale} />
 
             <p className="form-note">
               {hero.formNoteBefore}

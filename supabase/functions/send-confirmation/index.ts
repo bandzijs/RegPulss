@@ -43,6 +43,8 @@ Deno.serve(async (req) => {
   const email = (payload.record?.email ?? payload.email)?.trim();
   const confirmationToken = (payload.record?.confirmation_token ?? payload.confirmationToken)?.trim();
   const locale = payload.locale === "lv" ? "lv" : "en";
+  console.log("send-confirmation payload locale:", payload.locale);
+  console.log("send-confirmation forwarded locale:", locale);
 
   if (!email || !confirmationToken) {
     return new Response(
@@ -63,6 +65,7 @@ Deno.serve(async (req) => {
       locale,
     }),
   });
+  console.log("send-confirmation API forward body locale:", locale);
 
   const apiData = await apiResponse.json();
 

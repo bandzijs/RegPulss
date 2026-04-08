@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { Dictionary } from '@/lib/i18n/types';
+import type { Dictionary, Locale } from '@/lib/i18n/types';
 
 function getLocaleFromCookie(): 'en' | 'lv' {
   if (typeof document === 'undefined') {
@@ -18,9 +18,10 @@ function getLocaleFromCookie(): 'en' | 'lv' {
 
 interface SubscribeFormProps {
   messages: Dictionary['subscribe'];
+  locale: Locale;
 }
 
-export default function SubscribeForm({ messages }: SubscribeFormProps) {
+export default function SubscribeForm({ messages, locale: initialLocale }: SubscribeFormProps) {
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +49,9 @@ export default function SubscribeForm({ messages }: SubscribeFormProps) {
     setLoading(true);
 
     try {
-      const locale = getLocaleFromCookie();
+      // Cookie is httpOnly in production, so prefer server-provided locale.
+      const locale = initialLocale ?? getLocaleFromCookie();
+      console.log('locale being sent:', locale);
       const res = await fetch('/api/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
