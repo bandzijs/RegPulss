@@ -112,10 +112,12 @@ export async function POST(request: NextRequest): Promise<NextResponse<Subscribe
     }
 
     // Parse request body
-    const body: SubscribeRequest = await request.json();
-    const { email, locale: requestedLocale } = body;
-    console.log('received locale:', requestedLocale);
-    const confirmationLocale: Locale = isLocale(requestedLocale) ? requestedLocale : 'en';
+    const rawBody = await request.text();
+    console.log('raw request body:', rawBody);
+    const body = JSON.parse(rawBody) as SubscribeRequest;
+    const { email, locale: bodyLocale } = body;
+    console.log('received locale:', bodyLocale);
+    const confirmationLocale: Locale = isLocale(bodyLocale) ? bodyLocale : 'en';
 
     // Validate email
     if (!email || typeof email !== 'string') {

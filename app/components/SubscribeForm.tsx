@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Dictionary, Locale } from '@/lib/i18n/types';
 
 function getLocaleFromCookie(): 'en' | 'lv' {
@@ -25,6 +25,10 @@ export default function SubscribeForm({ messages, locale: initialLocale }: Subsc
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    console.log('SubscribeForm locale prop:', initialLocale);
+  }, [initialLocale]);
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -52,6 +56,10 @@ export default function SubscribeForm({ messages, locale: initialLocale }: Subsc
       // Cookie is httpOnly in production, so prefer server-provided locale.
       const locale = initialLocale ?? getLocaleFromCookie();
       console.log('locale being sent:', locale);
+      console.log(
+        'full request body being sent:',
+        JSON.stringify({ email, locale })
+      );
       const res = await fetch('/api/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

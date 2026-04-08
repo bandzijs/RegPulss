@@ -31,6 +31,7 @@ import { getLocale } from '@/lib/i18n/locale';
  */
 export default async function Home() {
   const locale = await getLocale();
+  console.log('page locale:', locale);
   const dict = getDictionary(locale);
 
   return (
