@@ -41,7 +41,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import DashboardEmailEditor, { type EmailEditorHandle } from './email-editor';
 
@@ -567,11 +567,6 @@ export default function DashboardClient({
               setActiveTab(value as 'subscribers' | 'newsletter')
             }
           >
-            <TabsList className="grid w-full max-w-md grid-cols-2">
-              <TabsTrigger value="subscribers">Subscribers</TabsTrigger>
-              <TabsTrigger value="newsletter">Send Newsletter</TabsTrigger>
-            </TabsList>
-
             <TabsContent value="subscribers" className="mt-4">
               <Card className="shadow-sm">
                 <CardHeader>
@@ -811,39 +806,43 @@ export default function DashboardClient({
                         {emailBodyStats.words} words • {emailBodyStats.characters} characters
                       </p>
                     </div>
-                    <div className="flex flex-wrap gap-3">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleUploadDesignFromStorage}
-                        disabled={!editorReady || sendState.status === 'loading'}
-                      >
-                        Upload Design
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleUploadDesignClick}
-                        disabled={!editorReady || sendState.status === 'loading'}
-                      >
-                        Upload JSON
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleDownloadDesign}
-                        disabled={!editorReady || sendState.status === 'loading'}
-                      >
-                        Download JSON
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={handleSendNewsletter}
-                        disabled={!editorReady || sendState.status === 'loading'}
-                        className="bg-[#E53E3E] text-white hover:bg-[#c53030]"
-                      >
-                        {sendState.status === 'loading' ? 'Sending...' : 'Send Newsletter'}
-                      </Button>
+                    <div className="border-t border-[var(--color-border)] pt-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleUploadDesignFromStorage}
+                            disabled={!editorReady || sendState.status === 'loading'}
+                          >
+                            Upload Design
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleUploadDesignClick}
+                            disabled={!editorReady || sendState.status === 'loading'}
+                          >
+                            Upload JSON
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleDownloadDesign}
+                            disabled={!editorReady || sendState.status === 'loading'}
+                          >
+                            Download JSON
+                          </Button>
+                        </div>
+                        <Button
+                          type="button"
+                          onClick={handleSendNewsletter}
+                          disabled={!editorReady || sendState.status === 'loading'}
+                          className="bg-[#E53E3E] text-white hover:bg-[#c53030]"
+                        >
+                          {sendState.status === 'loading' ? 'Sending...' : 'Send Newsletter'}
+                        </Button>
+                      </div>
                     </div>
                     {sendState.status !== 'idle' ? (
                       <p
