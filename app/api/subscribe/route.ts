@@ -177,13 +177,25 @@ export async function POST(request: NextRequest): Promise<NextResponse<Subscribe
 
     // Send confirmation email via Edge Function (non-blocking — row is already persisted)
     if (data?.confirmation_token) {
+      const confirmationToken = data.confirmation_token;
+      const unsubscribeToken = data.unsubscribe_token;
+
+      console.log(
+        'invoking send-confirmation with payload:',
+        JSON.stringify({
+          locale: confirmationLocale,
+          email,
+          confirmation_token: confirmationToken,
+        })
+      );
+
       const { error: functionError } = await supabase.functions.invoke('send-confirmation', {
         body: {
           locale: confirmationLocale,
           record: {
             email,
-            confirmation_token: data.confirmation_token,
-            unsubscribe_token: data.unsubscribe_token,
+            confirmation_token: confirmationToken,
+            unsubscribe_token: unsubscribeToken,
           },
         },
       });

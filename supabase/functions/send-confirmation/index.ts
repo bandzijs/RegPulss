@@ -103,7 +103,11 @@ Deno.serve(async (req) => {
   let payload: RequestPayload;
 
   try {
-    payload = await req.json();
+    const rawBody = await req.text();
+    console.log("raw body received:", rawBody);
+    payload = JSON.parse(rawBody) as RequestPayload;
+    console.log("parsed locale:", payload.locale);
+    console.log("parsed record:", payload.record);
   } catch {
     return new Response(
       JSON.stringify({ error: "Invalid JSON body" }),
@@ -115,7 +119,6 @@ Deno.serve(async (req) => {
   const confirmationToken = (payload.record?.confirmation_token ?? payload.confirmationToken)?.trim();
   const unsubscribeToken = payload.record?.unsubscribe_token?.trim();
   const locale = payload.locale === "lv" ? "lv" : "en";
-  console.log("send-confirmation payload locale:", payload.locale);
 
   if (!email || !confirmationToken) {
     return new Response(
