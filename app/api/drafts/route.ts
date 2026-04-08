@@ -57,17 +57,23 @@ interface CreateDraftBody {
 }
 
 export async function POST(request: Request) {
-  const authClient = createServerClient();
-  const {
-    data: { user },
-  } = await authClient.auth.getUser();
+  const botSecret = request.headers.get('x-bot-secret');
+  const isBotAuthorized =
+    Boolean(botSecret) && botSecret === process.env.BOT_SECRET;
 
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!isBotAuthorized) {
+    const authClient = createServerClient();
+    const {
+      data: { user },
+    } = await authClient.auth.getUser();
 
-  if (!isAdminEmail(user.email ?? undefined)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!isAdminEmail(user.email ?? undefined)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
   }
 
   let body: CreateDraftBody;
