@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
-import { render } from '@react-email/render';
 import { Resend } from 'resend';
 import { createClient } from '@/utils/supabase/server';
-import { Newsletter } from '@/emails/newsletter';
-import React from 'react';
+
+// Email system:
+// - Newsletters: designed in Unlayer editor, sent as raw HTML
+// - Transactional (confirmation): rendered via React Email templates
 
 interface NewsletterRequestBody {
   subject: string;
-  body?: string;
-  html?: string;
+  html: string;
 }
 
 function chunkEmails(emails: string[], size: number): string[][] {
@@ -56,12 +56,11 @@ export async function POST(request: Request) {
   }
 
   const subject = payload.subject?.trim();
-  const body = payload.body?.trim();
-  const htmlFromRequest = payload.html?.trim();
+  const html = payload.html?.trim();
 
-  if (!subject || (!body && !htmlFromRequest)) {
+  if (!subject || !html) {
     return NextResponse.json(
-      { success: false, error: 'Subject and email content are required' },
+      { success: false, error: 'Subject and html are required' },
       { status: 400 }
     );
   }
@@ -93,9 +92,6 @@ export async function POST(request: Request) {
 
   const resend = new Resend(resendApiKey);
   const emailChunks = chunkEmails(emails, 50);
-  const html = htmlFromRequest
-    ? htmlFromRequest
-    : await render(React.createElement(Newsletter, { subject, body: body ?? '' }));
 
   try {
     for (const to of emailChunks) {

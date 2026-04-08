@@ -162,7 +162,6 @@ export default function DashboardClient({
   );
   const [query, setQuery] = useState('');
   const [subject, setSubject] = useState('');
-  const [body, setBody] = useState('');
   const [previewHtml, setPreviewHtml] = useState('');
   const [showPreview, setShowPreview] = useState(false);
   const [previewViewport, setPreviewViewport] = useState<PreviewViewport>('desktop');
@@ -390,7 +389,7 @@ export default function DashboardClient({
     if (!html.trim()) {
       setSendState({
         status: 'error',
-        message: 'Email content is empty.',
+        message: 'Please design your email before sending',
       });
       return;
     }
@@ -403,7 +402,6 @@ export default function DashboardClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subject: subject.trim(),
-          body: body.trim(),
           html,
         }),
       });
@@ -794,7 +792,6 @@ export default function DashboardClient({
                             onReady={() => setEditorReady(true)}
                             onExportHtml={(html) => {
                               setPreviewHtml(html);
-                              setBody(html);
                               setIsDesignSaved(false);
                             }}
                             initialDesign={initialDesign}
