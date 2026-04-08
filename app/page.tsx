@@ -31,7 +31,6 @@ import { getLocale } from '@/lib/i18n/locale';
  */
 export default async function Home() {
   const locale = await getLocale();
-  console.log('page locale:', locale);
   const dict = getDictionary(locale);
 
   return (
@@ -42,7 +41,7 @@ export default async function Home() {
           <ConfirmationToast />
         </Suspense>
         <Header locale={locale} dict={{ nav: dict.nav, language: dict.language }} />
-        <HeroSection locale={locale} dict={{ hero: dict.hero, subscribe: dict.subscribe }} />
+        <HeroSection dict={{ hero: dict.hero, subscribe: dict.subscribe }} />
         <TrustSection dict={{ trust: dict.trust }} />
         <BenefitsSection dict={{ benefits: dict.benefits }} />
         <Footer dict={{ footer: dict.footer }} />

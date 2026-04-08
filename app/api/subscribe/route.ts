@@ -9,7 +9,6 @@ import type { Locale } from '@/lib/i18n/types';
 
 interface SubscribeRequest {
   email: string;
-  locale?: Locale;
 }
 
 interface SubscribeResponse {
@@ -112,12 +111,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<Subscribe
     }
 
     // Parse request body
-    const rawBody = await request.text();
-    console.log('raw request body:', rawBody);
-    const body = JSON.parse(rawBody) as SubscribeRequest;
-    const { email, locale: bodyLocale } = body;
-    console.log('received locale:', bodyLocale);
-    const confirmationLocale: Locale = isLocale(bodyLocale) ? bodyLocale : 'en';
+    const body = (await request.json()) as SubscribeRequest;
+    const { email } = body;
+    const localeCookie = request.cookies.get('regpulss_locale')?.value;
+    const confirmationLocale: Locale = isLocale(localeCookie) ? localeCookie : 'en';
+    console.log('locale from cookie:', confirmationLocale);
 
     // Validate email
     if (!email || typeof email !== 'string') {
