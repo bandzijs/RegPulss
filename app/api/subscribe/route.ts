@@ -4,10 +4,12 @@ import { rateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import { env } from '@/lib/env';
 import { getDictionary } from '@/lib/i18n/dictionaries';
-import { getLocale } from '@/lib/i18n/locale';
+import { getLocale, isLocale } from '@/lib/i18n/locale';
+import type { Locale } from '@/lib/i18n/types';
 
 interface SubscribeRequest {
   email: string;
+  locale?: Locale;
 }
 
 interface SubscribeResponse {
@@ -111,7 +113,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<Subscribe
 
     // Parse request body
     const body: SubscribeRequest = await request.json();
-    const { email } = body;
+    const { email, locale: requestedLocale } = body;
+    const confirmationLocale: Locale = isLocale(requestedLocale) ? requestedLocale : 'en';
 
     // Validate email
     if (!email || typeof email !== 'string') {
@@ -175,6 +178,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Subscribe
     if (data?.confirmation_token) {
       const { error: functionError } = await supabase.functions.invoke('send-confirmation', {
         body: {
+          locale: confirmationLocale,
           record: {
             email,
             confirmation_token: data.confirmation_token,

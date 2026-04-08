@@ -3,6 +3,7 @@ import "@supabase/functions-js/edge-runtime.d.ts";
 type RequestPayload = {
   email?: string;
   confirmationToken?: string;
+  locale?: "en" | "lv";
   record?: {
     email?: string;
     confirmation_token?: string;
@@ -41,6 +42,7 @@ Deno.serve(async (req) => {
 
   const email = (payload.record?.email ?? payload.email)?.trim();
   const confirmationToken = (payload.record?.confirmation_token ?? payload.confirmationToken)?.trim();
+  const locale = payload.locale === "lv" ? "lv" : "en";
 
   if (!email || !confirmationToken) {
     return new Response(
@@ -58,6 +60,7 @@ Deno.serve(async (req) => {
     body: JSON.stringify({
       email,
       confirmationToken,
+      locale,
     }),
   });
 

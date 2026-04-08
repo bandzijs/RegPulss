@@ -10,6 +10,7 @@ import {
   Section,
   Text,
 } from '@react-email/components';
+import type { Locale } from '@/lib/i18n/types';
 
 const sans =
   "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif";
@@ -18,13 +19,36 @@ const serif = "Georgia, 'Times New Roman', Times, serif";
 export interface ConfirmationProps {
   email: string;
   confirmationUrl: string;
+  locale?: Locale;
 }
 
-export function Confirmation({ email, confirmationUrl }: ConfirmationProps) {
+const content = {
+  en: {
+    subject: 'Confirm your subscription',
+    title: 'Confirm your subscription',
+    body: 'Thank you for subscribing. Please confirm your email address by clicking the button below.',
+    button: 'Confirm Subscription',
+    fallback: 'If the button does not work, copy and paste this link into your browser:',
+    unsubscribe: "Don't want these emails?",
+    unsubscribeLink: 'Unsubscribe',
+  },
+  lv: {
+    subject: 'Apstipriniet savu abonementu',
+    title: 'Apstipriniet savu abonementu',
+    body: 'Paldies, ka abonējāt. Lūdzu, apstipriniet savu e-pasta adresi, noklikšķinot uz pogas zemāk.',
+    button: 'Apstiprināt abonementu',
+    fallback: 'Ja poga nedarbojas, kopējiet un ielīmējiet šo saiti savā pārlūkprogrammā:',
+    unsubscribe: 'Nevēlaties šos e-pastus?',
+    unsubscribeLink: 'Atrakstīties',
+  },
+} as const;
+
+export function Confirmation({ email, confirmationUrl, locale = 'en' }: ConfirmationProps) {
+  const t = content[locale];
   return (
     <Html>
       <Head />
-      <Preview>Confirm your subscription</Preview>
+      <Preview>{t.subject}</Preview>
       <Body
         style={{
           backgroundColor: '#ffffff',
@@ -67,7 +91,7 @@ export function Confirmation({ email, confirmationUrl }: ConfirmationProps) {
                 lineHeight: 1.25,
               }}
             >
-              Confirm your subscription
+              {t.title}
             </Text>
             <Text
               style={{
@@ -82,8 +106,7 @@ export function Confirmation({ email, confirmationUrl }: ConfirmationProps) {
                 marginRight: 'auto',
               }}
             >
-              Thank you for subscribing. Please confirm your email address by
-              clicking the button below.
+              {t.body}
             </Text>
             <Text
               style={{
@@ -113,7 +136,7 @@ export function Confirmation({ email, confirmationUrl }: ConfirmationProps) {
                   letterSpacing: '0.02em',
                 }}
               >
-                Confirm Subscription
+                {t.button}
               </Button>
             </Section>
             <Text
@@ -126,14 +149,31 @@ export function Confirmation({ email, confirmationUrl }: ConfirmationProps) {
                 textAlign: 'center',
               }}
             >
-              If the button does not work, copy and paste this link into your
-              browser:
+              {t.fallback}
               <br />
               <Link
                 href={String(confirmationUrl)}
                 style={{ color: '#DC2626', textDecoration: 'underline' }}
               >
                 {confirmationUrl}
+              </Link>
+            </Text>
+            <Text
+              style={{
+                margin: '16px 0 0 0',
+                fontFamily: sans,
+                fontSize: '12px',
+                lineHeight: 1.6,
+                color: '#666666',
+                textAlign: 'center',
+              }}
+            >
+              {t.unsubscribe}{' '}
+              <Link
+                href={String(confirmationUrl)}
+                style={{ color: '#DC2626', textDecoration: 'underline' }}
+              >
+                {t.unsubscribeLink}
               </Link>
             </Text>
           </Section>

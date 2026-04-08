@@ -4,10 +4,13 @@ import { render } from '@react-email/render';
 import { Resend } from 'resend';
 import { Confirmation } from '@/emails/confirmation';
 import { env } from '@/lib/env';
+import { isLocale } from '@/lib/i18n/locale';
+import type { Locale } from '@/lib/i18n/types';
 
 interface ConfirmationPayload {
   email?: string;
   confirmationToken?: string;
+  locale?: Locale;
 }
 
 export async function POST(request: Request) {
@@ -41,6 +44,7 @@ export async function POST(request: Request) {
 
   const email = payload.email?.trim();
   const confirmationToken = payload.confirmationToken?.trim();
+  const locale: Locale = isLocale(payload.locale) ? payload.locale : 'en';
 
   if (!email || !confirmationToken) {
     return NextResponse.json(
@@ -54,6 +58,7 @@ export async function POST(request: Request) {
     React.createElement(Confirmation, {
       email,
       confirmationUrl,
+      locale,
     })
   );
 
@@ -61,7 +66,7 @@ export async function POST(request: Request) {
   const { error } = await resend.emails.send({
     from: 'RegPulss <newsletter@regpulss.lv>',
     to: email,
-    subject: 'Confirm your RegPulss subscription',
+    subject: locale === 'lv' ? 'Apstipriniet savu abonementu' : 'Confirm your subscription',
     html,
   });
 

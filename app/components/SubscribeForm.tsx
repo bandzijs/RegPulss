@@ -3,6 +3,19 @@
 import { useState } from 'react';
 import type { Dictionary } from '@/lib/i18n/types';
 
+function getLocaleFromCookie(): 'en' | 'lv' {
+  if (typeof document === 'undefined') {
+    return 'en';
+  }
+
+  const match = document.cookie
+    .split('; ')
+    .find((part) => part.startsWith('regpulss_locale='));
+  const value = match?.split('=')[1];
+
+  return value === 'lv' ? 'lv' : 'en';
+}
+
 interface SubscribeFormProps {
   messages: Dictionary['subscribe'];
 }
@@ -35,10 +48,11 @@ export default function SubscribeForm({ messages }: SubscribeFormProps) {
     setLoading(true);
 
     try {
+      const locale = getLocaleFromCookie();
       const res = await fetch('/api/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, locale }),
       });
 
       const body = await res.json();
