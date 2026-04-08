@@ -170,7 +170,7 @@ const navItems: {
   { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
   { id: 'drafts', label: 'Drafts', icon: FileText },
   { id: 'subscribers', label: 'Subscribers', icon: Users },
-  { id: 'newsletter', label: 'Send Newsletter', icon: Mail },
+  { id: 'newsletter', label: 'Newsletter Editor', icon: Mail },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
@@ -237,6 +237,9 @@ export default function DashboardClient({
   const [draftsLoading, setDraftsLoading] = useState(false);
   const [draftsError, setDraftsError] = useState<string | null>(null);
   const [draftActionId, setDraftActionId] = useState<string | null>(null);
+  const [draftPreviewLoadingId, setDraftPreviewLoadingId] = useState<
+    string | null
+  >(null);
   const [toast, setToast] = useState<{
     message: string;
     type: 'success' | 'error';
@@ -828,6 +831,33 @@ export default function DashboardClient({
     }
   }
 
+  async function handlePreviewDraftFromCard(draft: NewsletterDraft) {
+    setDraftPreviewLoadingId(draft.id);
+    try {
+      const res = await fetch(`/api/drafts/${draft.id}`);
+      const payload = (await res.json()) as
+        | { draft: NewsletterDraft }
+        | { error: string };
+      if (!res.ok || !('draft' in payload)) {
+        showToast(
+          setToast,
+          'error' in payload ? payload.error : 'Failed to load draft',
+          'error'
+        );
+        return;
+      }
+      setSubject(payload.draft.subject ?? '');
+      setPreviewHtml(payload.draft.html_content ?? '');
+      setShowPreview(true);
+      setSendState({ status: 'idle', message: '' });
+    } catch (error) {
+      console.error(error);
+      showToast(setToast, 'Failed to load draft preview.', 'error');
+    } finally {
+      setDraftPreviewLoadingId(null);
+    }
+  }
+
   async function handleSendNewsletter() {
     if (!subject.trim()) {
       setSendState({
@@ -1029,7 +1059,7 @@ export default function DashboardClient({
                 <CardTitle>Subscriber Growth</CardTitle>
                 <CardDescription>Cumulative signups over time</CardDescription>
               </CardHeader>
-              <CardContent className="h-64">
+              <CardContent className="h-[11.2rem] min-h-[11.2rem]">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={growthData}>
                     <defs>
@@ -1163,6 +1193,17 @@ export default function DashboardClient({
                                 </Button>
                                 <Button
                                   type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={
+                                    busy || draftPreviewLoadingId === draft.id
+                                  }
+                                  onClick={() => void handlePreviewDraftFromCard(draft)}
+                                >
+                                  Preview
+                                </Button>
+                                <Button
+                                  type="button"
                                   size="sm"
                                   disabled={busy || !isDraft}
                                   className="bg-[#E53E3E] text-white hover:bg-[#c53030]"
@@ -1256,7 +1297,7 @@ export default function DashboardClient({
               <div className="mt-4 w-full max-w-none">
                 <Card className="w-full max-w-none shadow-sm">
                   <CardHeader>
-                    <CardTitle>Send Newsletter</CardTitle>
+                    <CardTitle>Newsletter Editor</CardTitle>
                     <CardDescription>
                       Draft and send a bulk message to all subscribers.
                     </CardDescription>
