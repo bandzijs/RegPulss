@@ -35,9 +35,13 @@ export default function SubscribeForm({ messages }: SubscribeFormProps) {
     setLoading(true);
 
     try {
+      const pageLang = document.documentElement.lang;
       const res = await fetch('/api/subscribe', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-locale': pageLang || 'en',
+        },
         body: JSON.stringify({ email }),
       });
 
