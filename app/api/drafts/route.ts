@@ -8,44 +8,62 @@ function isAdminEmail(email: string | undefined): boolean {
 }
 
 export async function GET() {
-  const authClient = createServerClient();
-  const {
-    data: { user },
-  } = await authClient.auth.getUser();
+  console.log('GET /api/drafts called');
+  try {
+    const authClient = createServerClient();
+    const {
+      data: { user },
+    } = await authClient.auth.getUser();
 
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  if (!isAdminEmail(user.email ?? undefined)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+    if (!isAdminEmail(user.email ?? undefined)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
-  const supabase = createServiceRoleSupabaseClient();
-  if (!supabase) {
-    console.error(
-      'Drafts GET: missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY'
-    );
-    return NextResponse.json(
-      { error: 'Server configuration error' },
-      { status: 500 }
-    );
-  }
+    const supabase = createServiceRoleSupabaseClient();
+    if (!supabase) {
+      console.error(
+        'Drafts GET: missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY'
+      );
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      );
+    }
 
-  const { data, error } = await supabase
-    .from('newsletters')
-    .select('*')
-    .order('created_at', { ascending: false });
+    const queryPromise = supabase
+      .from('newsletters')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('Failed to fetch newsletters:', JSON.stringify(error));
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Drafts GET timeout')), 10000);
+    });
+
+    const { data, error } = (await Promise.race([
+      queryPromise,
+      timeoutPromise,
+    ])) as Awaited<typeof queryPromise>;
+
+    if (error) {
+      console.error('Failed to fetch newsletters:', JSON.stringify(error));
+      return NextResponse.json(
+        { error: 'Failed to load drafts' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ drafts: data ?? [] });
+  } catch (error) {
+    console.error('Drafts GET unexpected error:', error);
     return NextResponse.json(
       { error: 'Failed to load drafts' },
       { status: 500 }
     );
   }
-
-  return NextResponse.json({ drafts: data ?? [] });
 }
 
 interface CreateDraftBody {
