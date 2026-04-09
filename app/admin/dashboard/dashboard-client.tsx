@@ -506,7 +506,7 @@ export default function DashboardClient({
     setDraftsLoading(true);
     setDraftsError(null);
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    const timeout = setTimeout(() => controller.abort(), 15000);
     try {
       const res = await fetch('/api/drafts', {
         method: 'GET',
@@ -547,7 +547,11 @@ export default function DashboardClient({
       clearTimeout(timeout);
       console.error('fetchDrafts error:', e);
       setDrafts([]);
-      setDraftsError('Failed to load drafts');
+      if (e instanceof DOMException && e.name === 'AbortError') {
+        setDraftsError('Loading took too long — please refresh');
+      } else {
+        setDraftsError('Failed to load drafts');
+      }
     } finally {
       clearTimeout(timeout);
       setDraftsLoading(false);
