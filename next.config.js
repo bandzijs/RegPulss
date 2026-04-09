@@ -41,6 +41,17 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || 'https://regpulss.com',
   },
+
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = [
+        ...(config.externals || []),
+        'grapesjs',
+        'grapesjs-preset-newsletter',
+      ]
+    }
+    return config
+  },
 }
 
 module.exports = nextConfig

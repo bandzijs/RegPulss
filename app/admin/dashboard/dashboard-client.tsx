@@ -57,9 +57,27 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import type { GrapesEditorHandle } from './grapes-editor';
+import type { GrapesEditorHandle } from './grapes-editor.client';
 
-const GrapesEditor = dynamic(() => import('./grapes-editor'), { ssr: false });
+const GrapesEditor = dynamic(
+  () => import('./grapes-editor.client'),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        style={{
+          height: '700px',
+          background: '#f5f5f5',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        Loading editor...
+      </div>
+    ),
+  }
+);
 
 interface Subscriber {
   id: string;
