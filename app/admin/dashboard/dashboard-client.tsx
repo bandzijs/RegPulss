@@ -183,6 +183,127 @@ const navItems: {
 const NEWSLETTER_DESIGN_KEY = 'regpulss_email_design';
 type PreviewViewport = 'desktop' | 'mobile';
 
+const PRESET_STANDARD_HTML = `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;color:#1f2937;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:24px 0;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="620" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+            <tr><td style="background:#E53E3E;color:#ffffff;padding:20px 24px;font-size:22px;font-weight:700;">RegPulss</td></tr>
+            <tr><td style="padding:24px;font-size:15px;line-height:1.65;">
+              <h2 style="margin:0 0 12px;font-size:20px;color:#111827;">Juridisko jaunumu apskats</h2>
+              <p style="margin:0 0 12px;">Pievienojiet šeit galvenos tiesību aktu atjauninājumus un to ietekmi uz klientiem.</p>
+              <p style="margin:0;">Šī ir RegPulss standarta vēstules veidne ar skaidru struktūru un sarkanu akcentu.</p>
+            </td></tr>
+            <tr><td style="padding:16px 24px;background:#f9fafb;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280;">
+              Jūs saņemat šo vēstuli, jo esat abonējis RegPulss. <a href="{{unsubscribe_url}}" style="color:#E53E3E;">Atteikties</a>
+            </td></tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+const PRESET_MINIMAL_HTML = `<!doctype html>
+<html>
+  <body style="margin:0;padding:24px;font-family:Arial,sans-serif;background:#ffffff;color:#111827;">
+    <main style="max-width:640px;margin:0 auto;">
+      <h2 style="margin:0 0 12px;font-size:22px;">RegPulss jaunumi</h2>
+      <p style="margin:0 0 12px;line-height:1.65;">Šī ir minimāla vēstules veidne: bez smagas stilizācijas, tikai saturs un kājene.</p>
+      <p style="margin:0;line-height:1.65;">Pievienojiet saturu šeit.</p>
+      <hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb;" />
+      <p style="font-size:12px;color:#6b7280;">Atteikšanās saite: <a href="{{unsubscribe_url}}" style="color:#111827;">{{unsubscribe_url}}</a></p>
+    </main>
+  </body>
+</html>`;
+
+const PRESET_PROFESSIONAL_HTML = `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#eef2f7;font-family:Arial,sans-serif;color:#111827;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:32px 0;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #dbe3ee;">
+            <tr><td style="background:#1f2937;color:#ffffff;padding:18px 24px;font-size:20px;font-weight:700;">RegPulss Legal Brief</td></tr>
+            <tr><td style="padding:24px 28px;font-size:15px;line-height:1.7;">
+              <h3 style="margin:0 0 12px;font-size:19px;color:#111827;">Nedēļas juridiskais kopsavilkums</h3>
+              <p style="margin:0 0 12px;">Profesionāla veidne ar tumšu galveni un tīru satura zonu juridiskām ziņām.</p>
+              <p style="margin:0;">Pievienojiet svarīgākos punktus, ietekmes analīzi un avotus.</p>
+            </td></tr>
+            <tr><td style="padding:14px 28px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b;">
+              RegPulss • Profesionāls juridisko jaunumu serviss • <a href="{{unsubscribe_url}}" style="color:#1f2937;">Atteikties</a>
+            </td></tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+const PRESET_STANDARD_DESIGN = {
+  body: {
+    rows: [
+      {
+        cells: [1],
+        columns: [
+          {
+            contents: [
+              {
+                type: 'heading',
+                values: { text: 'RegPulss', headingType: 'h1', color: '#E53E3E' },
+              },
+              {
+                type: 'text',
+                values: { text: 'Juridisko jaunumu apskats. Pievienojiet galvenos punktus šeit.' },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+};
+
+const PRESET_MINIMAL_DESIGN = {
+  body: {
+    rows: [
+      {
+        cells: [1],
+        columns: [
+          {
+            contents: [
+              { type: 'heading', values: { text: 'RegPulss jaunumi', headingType: 'h2' } },
+              { type: 'text', values: { text: 'Minimāla veidne ar vienkāršu saturu un kājeni.' } },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+};
+
+const PRESET_PROFESSIONAL_DESIGN = {
+  body: {
+    rows: [
+      {
+        cells: [1],
+        columns: [
+          {
+            contents: [
+              { type: 'heading', values: { text: 'RegPulss Legal Brief', headingType: 'h2', color: '#1f2937' } },
+              { type: 'text', values: { text: 'Profesionāla juridiskā stila veidne ar strukturētu saturu.' } },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+};
+
+type PresetKey = 'standard' | 'minimal' | 'professional';
+
 function sidebarInitials(email: string): string {
   return email.slice(0, 2).toUpperCase();
 }
@@ -253,6 +374,7 @@ export default function DashboardClient({
   const [isFullscreenEditor, setIsFullscreenEditor] = useState(false);
   const [htmlDraftMode, setHtmlDraftMode] = useState(false);
   const [rawHtmlContent, setRawHtmlContent] = useState('');
+  const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
   const [isDesignSaved, setIsDesignSaved] = useState(false);
   const [sendState, setSendState] = useState<{
     status: 'idle' | 'loading' | 'success' | 'error';
@@ -537,11 +659,60 @@ export default function DashboardClient({
     }
   }
 
+  function getPresetByKey(key: PresetKey): {
+    html: string;
+    design: object;
+    title: string;
+  } {
+    if (key === 'minimal') {
+      return {
+        html: PRESET_MINIMAL_HTML,
+        design: PRESET_MINIMAL_DESIGN as object,
+        title: 'Minimal',
+      };
+    }
+    if (key === 'professional') {
+      return {
+        html: PRESET_PROFESSIONAL_HTML,
+        design: PRESET_PROFESSIONAL_DESIGN as object,
+        title: 'Professional',
+      };
+    }
+    return {
+      html: PRESET_STANDARD_HTML,
+      design: PRESET_STANDARD_DESIGN as object,
+      title: 'RegPulss Standard',
+    };
+  }
+
+  function handleOpenPresetModal() {
+    setIsPresetModalOpen(true);
+  }
+
+  function handleApplyPreset(key: PresetKey) {
+    const preset = getPresetByKey(key);
+    if (htmlDraftMode) {
+      setRawHtmlContent(preset.html);
+      setPreviewHtml(preset.html);
+      setIsPresetModalOpen(false);
+      showToast(setToast, `${preset.title} preset applied.`, 'success');
+      return;
+    }
+
+    if (!emailEditorRef.current) {
+      showToast(setToast, 'Email editor is not ready yet.', 'error');
+      return;
+    }
+    emailEditorRef.current.loadDesign(preset.design);
+    setIsDesignSaved(false);
+    setIsPresetModalOpen(false);
+    showToast(setToast, `${preset.title} preset applied.`, 'success');
+  }
+
   function handleEditDraft(draft: NewsletterDraft) {
     setSubject(draft.subject ?? '');
     setEditingDraftId(draft.id);
     setIsDesignSaved(false);
-    setActiveSection('newsletter');
     setIsFullscreenEditor(false);
 
     if (draftHasJsonContent(draft.json_content)) {
@@ -560,6 +731,7 @@ export default function DashboardClient({
       setPreviewHtml(html);
       setEditorDesignKey((k) => k + 1);
     }
+    setActiveSection('newsletter');
   }
 
   async function handleSaveHtmlDraftChanges() {
@@ -1580,6 +1752,14 @@ export default function DashboardClient({
                               <Button
                                 type="button"
                                 variant="outline"
+                                onClick={handleOpenPresetModal}
+                                disabled={sendState.status === 'loading'}
+                              >
+                                Apply Preset
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
                                 onClick={handlePreviewNewsletter}
                                 disabled={sendState.status === 'loading'}
                               >
@@ -1597,7 +1777,7 @@ export default function DashboardClient({
                           </div>
                           <textarea
                             id="newsletter-html-raw"
-                            className="w-full min-h-[600px] resize-y rounded-md border border-input bg-background p-3 font-mono text-sm leading-relaxed"
+                            className="w-full min-h-[600px] resize-y overflow-auto rounded-md border border-input bg-background p-3 font-mono text-sm leading-relaxed whitespace-pre"
                             style={{ height: '600px' }}
                             value={rawHtmlContent}
                             onChange={(event) => {
@@ -1616,6 +1796,14 @@ export default function DashboardClient({
                               <Button
                                 type="button"
                                 variant="outline"
+                                  onClick={handleOpenPresetModal}
+                                  disabled={sendState.status === 'loading'}
+                                >
+                                  Apply Preset
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
                                 onClick={() => void handleSaveAsDraft()}
                                 disabled={sendState.status === 'loading'}
                               >
@@ -1772,6 +1960,17 @@ export default function DashboardClient({
                                     <Button
                                       type="button"
                                       variant="outline"
+                                      onClick={handleOpenPresetModal}
+                                      disabled={
+                                        !newsletterReady ||
+                                        sendState.status === 'loading'
+                                      }
+                                    >
+                                      Apply Preset
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
                                       onClick={handleDownloadDesign}
                                       disabled={
                                         !newsletterReady ||
@@ -1867,6 +2066,17 @@ export default function DashboardClient({
                                 <Button
                                   type="button"
                                   variant="outline"
+                                  onClick={handleOpenPresetModal}
+                                  disabled={
+                                    !newsletterReady ||
+                                    sendState.status === 'loading'
+                                  }
+                                >
+                                  Apply Preset
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
                                   onClick={handleDownloadDesign}
                                   disabled={
                                     !newsletterReady ||
@@ -1929,6 +2139,93 @@ export default function DashboardClient({
                   </CardContent>
                 </Card>
               </div>
+          ) : null}
+          {isPresetModalOpen ? (
+            <div className="fixed inset-0 z-50 bg-black/50 p-4 md:p-8 overflow-y-auto">
+              <div className="mx-auto max-w-3xl rounded-lg bg-white p-4 shadow-xl md:p-6">
+                <div className="mb-4 flex items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-lg font-semibold">Apply Preset</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Choose a template preset for your newsletter.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsPresetModalOpen(false)}
+                  >
+                    <X className="mr-1 h-4 w-4" />
+                    Close
+                  </Button>
+                </div>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <Card className="border shadow-sm">
+                    <CardHeader className="p-3 pb-2">
+                      <CardTitle className="text-sm">RegPulss Standard</CardTitle>
+                      <CardDescription className="text-xs">
+                        Clean RegPulss branded template, red accent, footer with unsubscribe link.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-3 pt-0 space-y-3">
+                      <div className="h-24 rounded border bg-gradient-to-b from-red-50 to-white p-2 text-[10px] text-muted-foreground">
+                        Red branded header, structured content, clean footer.
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => handleApplyPreset('standard')}
+                      >
+                        Use this template
+                      </Button>
+                    </CardContent>
+                  </Card>
+                  <Card className="border shadow-sm">
+                    <CardHeader className="p-3 pb-2">
+                      <CardTitle className="text-sm">Minimal</CardTitle>
+                      <CardDescription className="text-xs">
+                        Plain white email with content and footer, minimal styling.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-3 pt-0 space-y-3">
+                      <div className="h-24 rounded border bg-white p-2 text-[10px] text-muted-foreground">
+                        Lightweight layout focused on text readability.
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => handleApplyPreset('minimal')}
+                      >
+                        Use this template
+                      </Button>
+                    </CardContent>
+                  </Card>
+                  <Card className="border shadow-sm">
+                    <CardHeader className="p-3 pb-2">
+                      <CardTitle className="text-sm">Professional</CardTitle>
+                      <CardDescription className="text-xs">
+                        Dark header with legal newsletter style and white content area.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-3 pt-0 space-y-3">
+                      <div className="h-24 rounded border bg-gradient-to-b from-slate-900 to-white p-2 text-[10px] text-muted-foreground">
+                        Professional legal-brief look with clear hierarchy.
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => handleApplyPreset('professional')}
+                      >
+                        Use this template
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </div>
           ) : null}
           {showPreview ? (
             <div className="fixed inset-0 z-50 bg-black/50 p-4 md:p-8 overflow-y-auto">
