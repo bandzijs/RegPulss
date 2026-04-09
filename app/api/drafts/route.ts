@@ -2,9 +2,22 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/utils/supabase/server';
 import { createServiceRoleSupabaseClient } from '@/utils/supabase/service-role';
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-bot-secret',
+};
+
 function isAdminEmail(email: string | undefined): boolean {
   const allowed = process.env.ADMIN_EMAILS?.split(',') ?? [];
   return Boolean(email && allowed.includes(email));
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: corsHeaders,
+  });
 }
 
 export async function GET() {
@@ -56,7 +69,16 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json({ drafts: data ?? [] });
+    return NextResponse.json(
+      { drafts: data ?? [] },
+      {
+        headers: {
+          ...corsHeaders,
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   } catch (error) {
     console.error('Drafts GET unexpected error:', error);
     return NextResponse.json(

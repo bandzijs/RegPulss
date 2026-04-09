@@ -508,7 +508,12 @@ export default function DashboardClient({
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
     try {
-      const res = await fetch('/api/drafts', { signal: controller.signal });
+      const res = await fetch('/api/drafts', {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+      });
       clearTimeout(timeout);
       const data = (await res.json()) as unknown;
       console.log('drafts loaded:', data);
