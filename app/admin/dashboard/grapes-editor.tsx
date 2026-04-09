@@ -53,38 +53,84 @@ export default function GrapesEditor({
       document.head.appendChild(link);
     };
 
+    const resolveGjs = (): GrapesInit | undefined => {
+      const w = window as typeof window & { grapesjs?: GrapesInit | { default: GrapesInit } };
+      const raw = w.grapesjs;
+      if (typeof raw === 'function') {
+        return raw;
+      }
+      if (
+        raw &&
+        typeof raw === 'object' &&
+        'default' in raw &&
+        typeof raw.default === 'function'
+      ) {
+        return raw.default;
+      }
+      return undefined;
+    };
+
     const init = async () => {
       try {
         loadLink('https://unpkg.com/grapesjs/dist/css/grapes.min.css');
         await loadScript('https://unpkg.com/grapesjs');
         await loadScript('https://unpkg.com/grapesjs-preset-newsletter');
 
-        if (!mounted || !containerRef.current) return;
+        if (!mounted) return;
 
-        const w = window as typeof window & { grapesjs?: GrapesInit | { default: GrapesInit } };
-        const raw = w.grapesjs;
-        const gjs: GrapesInit | undefined =
-          typeof raw === 'function'
-            ? raw
-            : raw && typeof raw === 'object' && 'default' in raw && typeof raw.default === 'function'
-              ? raw.default
-              : undefined;
+        let retries = 0;
 
-        if (!gjs) return;
+        const tryInit = () => {
+          if (!mounted) return;
+          if (!containerRef.current) {
+            if (retries < 10) {
+              retries += 1;
+              setTimeout(tryInit, 200);
+            } else {
+              setLoading(false);
+            }
+            return;
+          }
 
-        const editor = gjs({
-          container: containerRef.current,
-          plugins: ['grapesjs-preset-newsletter'],
-          pluginsOpts: { 'grapesjs-preset-newsletter': {} },
-          storageManager: false,
-          height,
-          width: '100%',
-          components: initialHtml || '',
-        });
+          const gjs = resolveGjs();
+          if (!gjs) return;
 
-        editorRef.current = editor;
-        editor.on('update', () => onChange?.(editor.getHtml()));
-        setLoading(false);
+          if (editorRef.current) return;
+
+          try {
+            const editor = gjs({
+              container: containerRef.current,
+              plugins: ['grapesjs-preset-newsletter'],
+              pluginsOpts: { 'grapesjs-preset-newsletter': {} },
+              storageManager: false,
+              height,
+              width: '100%',
+              components: initialHtml || '',
+            });
+            editorRef.current = editor;
+            editor.on('update', () => onChange?.(editor.getHtml()));
+            setLoading(false);
+          } catch (err) {
+            console.error('GrapesJS init error:', err);
+            setLoading(false);
+          }
+        };
+
+        let scriptChecks = 0;
+        const checkScripts = () => {
+          if (!mounted) return;
+          const gjs = resolveGjs();
+          if (gjs) {
+            tryInit();
+          } else if (scriptChecks < 40) {
+            scriptChecks += 1;
+            setTimeout(checkScripts, 300);
+          } else {
+            setLoading(false);
+          }
+        };
+
+        checkScripts();
       } catch (err) {
         console.error('GrapesJS load error:', err);
         setLoading(false);
@@ -94,6 +140,10 @@ export default function GrapesEditor({
     void init();
     return () => {
       mounted = false;
+      if (editorRef.current) {
+        editorRef.current.destroy();
+        editorRef.current = null;
+      }
     };
   }, []);
   /* eslint-enable react-hooks/exhaustive-deps */
