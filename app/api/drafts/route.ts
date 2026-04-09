@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/utils/supabase/server';
 import { createServiceRoleSupabaseClient } from '@/utils/supabase/service-role';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+export const runtime = 'nodejs';
+export const maxDuration = 10;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -27,23 +26,38 @@ export async function OPTIONS() {
 export async function GET(request: NextRequest) {
   void request;
   try {
-    const supabase = createSupabaseClient(supabaseUrl, supabaseServiceKey);
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!url || !key) {
+      console.error('Missing env vars:', { url: !!url, key: !!key });
+      return NextResponse.json({ drafts: [] });
+    }
+
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(url, key, {
+      auth: { persistSession: false },
+    });
+
     const { data, error } = await supabase
       .from('newsletters')
       .select(
         'id, title, subject, status, source_urls, created_at, sent_at, html_content, json_content'
       )
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(50);
 
     if (error) {
       console.error('Supabase error:', error.message);
-      return NextResponse.json({ drafts: [] }, { status: 200 });
+      return NextResponse.json({ drafts: [] });
     }
 
-    return NextResponse.json({ drafts: data ?? [] }, { status: 200 });
-  } catch (err) {
-    console.error('GET /api/drafts error:', err);
-    return NextResponse.json({ drafts: [] }, { status: 200 });
+    console.log('GET /api/drafts success:', data?.length, 'rows');
+    return NextResponse.json({ drafts: data ?? [] });
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    console.error('GET /api/drafts crashed:', errorMessage);
+    return NextResponse.json({ drafts: [] });
   }
 }
 
