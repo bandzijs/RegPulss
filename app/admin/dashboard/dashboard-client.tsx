@@ -304,6 +304,38 @@ const PRESET_PROFESSIONAL_DESIGN = {
 
 type PresetKey = 'standard' | 'minimal' | 'professional';
 
+function convertHtmlToUnlayerDesign(html: string): object {
+  return {
+    body: {
+      rows: [
+        {
+          cells: [1],
+          columns: [
+            {
+              contents: [
+                {
+                  type: 'html',
+                  values: {
+                    html,
+                    containerPadding: '0px',
+                  },
+                },
+              ],
+            },
+          ],
+          values: {
+            backgroundColor: '#ffffff',
+          },
+        },
+      ],
+      values: {
+        backgroundColor: '#f4f4f4',
+        contentWidth: '600px',
+      },
+    },
+  };
+}
+
 function extractPlainTextFromHtml(html: string): string {
   if (!html.trim()) {
     return '';
@@ -402,6 +434,9 @@ export default function DashboardClient({
   const [subject, setSubject] = useState('');
   const [previewHtml, setPreviewHtml] = useState('');
   const [showPreview, setShowPreview] = useState(false);
+  const [previewSourceDraft, setPreviewSourceDraft] = useState<NewsletterDraft | null>(
+    null
+  );
   const [previewViewport, setPreviewViewport] = useState<PreviewViewport>('desktop');
   const [editorReady, setEditorReady] = useState(false);
   const [initialDesign, setInitialDesign] = useState<object | undefined>(
@@ -424,6 +459,7 @@ export default function DashboardClient({
   const [htmlDraftMode, setHtmlDraftMode] = useState(false);
   const [rawHtmlContent, setRawHtmlContent] = useState('');
   const [showPasteInfoBanner, setShowPasteInfoBanner] = useState(false);
+  const [editorInfoBanner, setEditorInfoBanner] = useState<string | null>(null);
   const [referencePanelSections, setReferencePanelSections] = useState<string[]>([]);
   const [isReferencePanelOpen, setIsReferencePanelOpen] = useState(true);
   const [pendingPresetToLoad, setPendingPresetToLoad] = useState<PresetKey | null>(
@@ -560,6 +596,7 @@ export default function DashboardClient({
       }
       setPreviewHtml(html);
       setShowPreview(true);
+      setPreviewSourceDraft(null);
       setSendState({ status: 'idle', message: '' });
       return;
     }
@@ -575,6 +612,7 @@ export default function DashboardClient({
       }
       setPreviewHtml(html);
       setShowPreview(true);
+      setPreviewSourceDraft(null);
       setSendState({ status: 'idle', message: '' });
     } catch (error) {
       console.error('Preview export failed:', error);
@@ -809,6 +847,7 @@ export default function DashboardClient({
     setEditorDesignKey((k) => k + 1);
     setPendingPresetToLoad('standard');
     setShowPasteInfoBanner(true);
+    setEditorInfoBanner('Paste your copied content into the blocks below');
     setReferencePanelSections(splitDraftIntoSections(plain));
     setIsReferencePanelOpen(true);
     setActiveSection('newsletter');
@@ -824,6 +863,7 @@ export default function DashboardClient({
       setHtmlDraftMode(false);
       setRawHtmlContent('');
       setShowPasteInfoBanner(false);
+      setEditorInfoBanner(null);
       setReferencePanelSections([]);
       setEditorReady(false);
       setInitialDesign(draft.json_content as object);
@@ -832,6 +872,7 @@ export default function DashboardClient({
     } else {
       setHtmlDraftMode(true);
       setShowPasteInfoBanner(false);
+      setEditorInfoBanner(null);
       setReferencePanelSections([]);
       setEditorReady(false);
       setInitialDesign(undefined);
@@ -1209,6 +1250,7 @@ export default function DashboardClient({
       }
       setSubject(payload.draft.subject ?? '');
       setPreviewHtml(payload.draft.html_content ?? '');
+      setPreviewSourceDraft(payload.draft);
       setShowPreview(true);
       setSendState({ status: 'idle', message: '' });
     } catch (error) {
@@ -1217,6 +1259,35 @@ export default function DashboardClient({
     } finally {
       setDraftPreviewLoadingId(null);
     }
+  }
+
+  function handleEditPreviewInUnlayer() {
+    if (!previewSourceDraft) {
+      showToast(setToast, 'No draft loaded in preview.', 'error');
+      return;
+    }
+
+    const html = (previewSourceDraft.html_content ?? '').trim();
+    if (!html) {
+      showToast(setToast, 'Draft is missing HTML content.', 'error');
+      return;
+    }
+
+    const design = convertHtmlToUnlayerDesign(html);
+    setShowPreview(false);
+    setHtmlDraftMode(false);
+    setRawHtmlContent('');
+    setShowPasteInfoBanner(false);
+    setEditorInfoBanner(
+      'Editing AI draft in visual editor — you can now drag and drop blocks'
+    );
+    setReferencePanelSections([]);
+    setSubject(previewSourceDraft.subject ?? '');
+    setEditingDraftId(previewSourceDraft.id);
+    setInitialDesign(design);
+    setEditorReady(false);
+    setEditorDesignKey((k) => k + 1);
+    setActiveSection('newsletter');
   }
 
   async function handleSendNewsletter() {
@@ -1879,9 +1950,10 @@ export default function DashboardClient({
                         </div>
                       ) : null}
 
-                      {!htmlDraftMode && showPasteInfoBanner ? (
+                      {!htmlDraftMode && (showPasteInfoBanner || editorInfoBanner) ? (
                         <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-                          Paste your copied content into the blocks below
+                          {editorInfoBanner ??
+                            'Paste your copied content into the blocks below'}
                         </div>
                       ) : null}
 
@@ -2449,8 +2521,26 @@ export default function DashboardClient({
                       <Smartphone className="mr-1 h-4 w-4" />
                       Mobile
                     </Button>
+                    {previewSourceDraft &&
+                    !draftHasJsonContent(previewSourceDraft.json_content) ? (
+                      <Button
+                        type="button"
+                        variant="default"
+                        className="bg-[#E53E3E] text-white hover:bg-[#c53030]"
+                        onClick={handleEditPreviewInUnlayer}
+                      >
+                        Edit in Unlayer
+                      </Button>
+                    ) : null}
                   </div>
-                  <Button type="button" variant="outline" onClick={() => setShowPreview(false)}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setShowPreview(false);
+                      setPreviewSourceDraft(null);
+                    }}
+                  >
                     <X className="mr-1 h-4 w-4" />
                     Close
                   </Button>
