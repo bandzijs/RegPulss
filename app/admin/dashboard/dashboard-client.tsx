@@ -501,18 +501,38 @@ export default function DashboardClient({
     setDraftsError(null);
     try {
       const res = await fetch('/api/drafts');
-      const payload = (await res.json()) as
-        | { drafts: NewsletterDraft[] }
-        | { error: string };
-      if (!res.ok || !('drafts' in payload)) {
-        setDraftsError(
-          'error' in payload ? payload.error : 'Failed to load drafts'
-        );
+      const payload = (await res.json()) as unknown;
+
+      if (!res.ok) {
+        const apiError =
+          typeof payload === 'object' &&
+          payload !== null &&
+          'error' in payload &&
+          typeof (payload as { error?: unknown }).error === 'string'
+            ? (payload as { error: string }).error
+            : 'Failed to load drafts';
+        setDraftsError(apiError);
         return;
       }
-      setDrafts(payload.drafts);
+
+      if (Array.isArray(payload)) {
+        setDrafts(payload as NewsletterDraft[]);
+        return;
+      }
+
+      if (
+        typeof payload === 'object' &&
+        payload !== null &&
+        'drafts' in payload &&
+        Array.isArray((payload as { drafts?: unknown }).drafts)
+      ) {
+        setDrafts((payload as { drafts: NewsletterDraft[] }).drafts);
+        return;
+      }
+
+      setDraftsError('Unexpected drafts response format');
     } catch (e) {
-      console.error(e);
+      console.error('Failed to fetch drafts:', e);
       setDraftsError('Failed to load drafts');
     } finally {
       setDraftsLoading(false);
