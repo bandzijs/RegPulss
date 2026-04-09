@@ -10,7 +10,6 @@ import {
   type Dispatch,
   type SetStateAction,
 } from 'react';
-import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import {
   Area,
@@ -57,27 +56,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import type { GrapesEditorHandle } from './grapes-editor.client';
-
-const GrapesEditor = dynamic(
-  () => import('./grapes-editor.client'),
-  {
-    ssr: false,
-    loading: () => (
-      <div
-        style={{
-          height: '700px',
-          background: '#f5f5f5',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        Loading editor...
-      </div>
-    ),
-  }
-);
 
 interface Subscriber {
   id: string;
@@ -325,38 +303,6 @@ const PRESET_PROFESSIONAL_DESIGN = {
 
 type PresetKey = 'standard' | 'minimal' | 'professional';
 
-function convertHtmlToUnlayerDesign(html: string): object {
-  return {
-    body: {
-      rows: [
-        {
-          cells: [1],
-          columns: [
-            {
-              contents: [
-                {
-                  type: 'html',
-                  values: {
-                    html,
-                    containerPadding: '0px',
-                  },
-                },
-              ],
-            },
-          ],
-          values: {
-            backgroundColor: '#ffffff',
-          },
-        },
-      ],
-      values: {
-        backgroundColor: '#f4f4f4',
-        contentWidth: '600px',
-      },
-    },
-  };
-}
-
 function extractPlainTextFromHtml(html: string): string {
   if (!html.trim()) {
     return '';
@@ -477,7 +423,6 @@ export default function DashboardClient({
     type: 'success' | 'error';
   } | null>(null);
   const [isFullscreenEditor, setIsFullscreenEditor] = useState(false);
-  const [rawHtmlContent, setRawHtmlContent] = useState('');
   const isDesignSaved = false;
   const [showPasteInfoBanner, setShowPasteInfoBanner] = useState(false);
   const [editorInfoBanner, setEditorInfoBanner] = useState<string | null>(null);
@@ -488,11 +433,7 @@ export default function DashboardClient({
     status: 'idle' | 'loading' | 'success' | 'error';
     message: string;
   }>({ status: 'idle', message: '' });
-  const emailEditorRef = useRef<GrapesEditorHandle | null>(null);
   const uploadHtmlInputRef = useRef<HTMLInputElement | null>(null);
-  const htmlDraftMode = false;
-  const editorReady = true;
-  const newsletterReady = true;
 
   useEffect(() => {
     setPendingDraftsCount(draftsCountProp);
@@ -638,50 +579,34 @@ export default function DashboardClient({
       return;
     }
 
-    try {
-      const html = await emailEditorRef.current?.getHtml();
-      if (!html) {
-        setSendState({
-          status: 'error',
-          message: 'Email editor is not ready yet.',
-        });
-        return;
-      }
-      setPreviewHtml(html);
-      setShowPreview(true);
-      setPreviewSourceDraft(null);
-      setSendState({ status: 'idle', message: '' });
-    } catch (error) {
-      console.error('Preview export failed:', error);
+    const html = editorHtml.trim();
+    if (!html) {
       setSendState({
         status: 'error',
-        message: 'Failed to generate preview from the email editor.',
+        message: 'Please add HTML content before previewing.',
       });
+      return;
     }
+    setPreviewHtml(html);
+    setShowPreview(true);
+    setPreviewSourceDraft(null);
+    setSendState({ status: 'idle', message: '' });
   }
 
   async function handleSaveDesign() {
-    try {
-      const html = (await emailEditorRef.current?.getHtml()) ?? '';
-      if (!html.trim()) {
-        setSendState({
-          status: 'error',
-          message: 'Editor HTML is empty.',
-        });
-        return;
-      }
-      window.localStorage.setItem(NEWSLETTER_DESIGN_KEY, html);
-      setSendState({
-        status: 'success',
-        message: 'Design saved locally.',
-      });
-    } catch (error) {
-      console.error(error);
+    const html = editorHtml.trim();
+    if (!html) {
       setSendState({
         status: 'error',
-        message: 'Failed to save design.',
+        message: 'Editor HTML is empty.',
       });
+      return;
     }
+    window.localStorage.setItem(NEWSLETTER_DESIGN_KEY, html);
+    setSendState({
+      status: 'success',
+      message: 'Design saved locally.',
+    });
   }
 
   function handleUploadDesignFromStorage() {
@@ -696,6 +621,7 @@ export default function DashboardClient({
       }
 
       setEditorHtml(raw);
+      setPreviewHtml(raw);
       setSendState({
         status: 'success',
         message: 'Saved HTML design loaded.',
@@ -714,35 +640,27 @@ export default function DashboardClient({
   }
 
   async function handleDownloadDesign() {
-    try {
-      const html = (await emailEditorRef.current?.getHtml()) ?? '';
-      if (!html.trim()) {
-        setSendState({
-          status: 'error',
-          message: 'Editor HTML is empty.',
-        });
-        return;
-      }
-      const blob = new Blob([html], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'regpulss-email-design.html';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-      setSendState({
-        status: 'success',
-        message: 'Design HTML downloaded.',
-      });
-    } catch (error) {
-      console.error(error);
+    const html = editorHtml.trim();
+    if (!html) {
       setSendState({
         status: 'error',
-        message: 'Failed to download design HTML.',
+        message: 'Editor HTML is empty.',
       });
+      return;
     }
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'regpulss-email-design.html';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setSendState({
+      status: 'success',
+      message: 'Design HTML downloaded.',
+    });
   }
 
   async function handleUploadDesignFile(event: ChangeEvent<HTMLInputElement>) {
@@ -754,6 +672,7 @@ export default function DashboardClient({
     try {
       const content = await file.text();
       setEditorHtml(content);
+      setPreviewHtml(content);
       window.localStorage.setItem(NEWSLETTER_DESIGN_KEY, content);
       setSendState({
         status: 'success',
@@ -857,58 +776,8 @@ export default function DashboardClient({
     setActiveSection('newsletter');
   }
 
-  async function handleSaveHtmlDraftChanges() {
-    if (!editingDraftId) {
-      showToast(setToast, 'No AI draft is being edited.', 'error');
-      return;
-    }
-
-    const html = ((await emailEditorRef.current?.getHtml()) ?? '').trim();
-    if (!html) {
-      showToast(setToast, 'HTML content is required.', 'error');
-      return;
-    }
-
-    const title = subject.trim() || 'Untitled draft';
-    const subj = subject.trim();
-
-    try {
-      const res = await fetch(`/api/drafts/${editingDraftId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          subject: subj,
-          html_content: html,
-        }),
-      });
-      const payload = (await res.json()) as { error?: string };
-      if (!res.ok) {
-        showToast(
-          setToast,
-          payload.error ?? 'Failed to save draft',
-          'error'
-        );
-        return;
-      }
-      showToast(setToast, 'Draft saved.', 'success');
-      void refreshDraftsCount();
-      void loadDraftsList();
-    } catch (error) {
-      console.error(error);
-      showToast(setToast, 'Failed to save draft.', 'error');
-    }
-  }
-
   async function handleSaveAsDraft() {
-    let html = '';
-    try {
-      html = (await emailEditorRef.current?.getHtml()) ?? '';
-    } catch (error) {
-      console.error(error);
-      showToast(setToast, 'Failed to read the editor HTML.', 'error');
-      return;
-    }
+    const html = editorHtml;
 
     if (!html.trim()) {
       showToast(setToast, 'Add content before saving a draft.', 'error');
@@ -1155,7 +1024,7 @@ export default function DashboardClient({
     }
   }
 
-  function handleEditPreviewInUnlayer() {
+  function handleEditPreviewInEditor() {
     if (!previewSourceDraft) {
       showToast(setToast, 'No draft loaded in preview.', 'error');
       return;
@@ -1167,18 +1036,15 @@ export default function DashboardClient({
       return;
     }
 
-    void convertHtmlToUnlayerDesign(html);
-    const convertedHtml = html;
     setShowPreview(false);
     setPreviewSourceDraft(null);
     setShowPasteInfoBanner(false);
-    setEditorInfoBanner(
-      'Editing AI draft in visual editor — you can now drag and drop blocks'
-    );
+    setEditorInfoBanner('Editing AI draft in HTML editor');
     setReferencePanelSections([]);
     setSubject(previewSourceDraft.subject ?? '');
     setEditingDraftId(previewSourceDraft.id);
-    setEditorHtml(convertedHtml);
+    setEditorHtml(html);
+    setPreviewHtml(html);
     setActiveSection('newsletter');
   }
 
@@ -1191,18 +1057,7 @@ export default function DashboardClient({
       return;
     }
 
-    let html = '';
-    try {
-      const exported = await emailEditorRef.current?.getHtml();
-      html = exported ?? '';
-    } catch (error) {
-      console.error('Send export failed:', error);
-      setSendState({
-        status: 'error',
-        message: 'Failed to export HTML from the editor.',
-      });
-      return;
-    }
+    const html = editorHtml;
 
     if (!html.trim()) {
       setSendState({
@@ -1838,14 +1693,14 @@ export default function DashboardClient({
                         </div>
                       ) : null}
 
-                      {!htmlDraftMode && (showPasteInfoBanner || editorInfoBanner) ? (
+                      {showPasteInfoBanner || editorInfoBanner ? (
                         <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
                           {editorInfoBanner ??
                             'Paste your copied content into the blocks below'}
                         </div>
                       ) : null}
 
-                      {!htmlDraftMode && referencePanelSections.length > 0 ? (
+                      {referencePanelSections.length > 0 ? (
                         <div className="rounded-md border border-slate-200 bg-slate-50">
                           <div className="flex items-center justify-between gap-2 px-4 py-3">
                             <p className="text-sm font-medium">
@@ -1897,94 +1752,7 @@ export default function DashboardClient({
                         </div>
                       ) : null}
 
-                      {htmlDraftMode ? (
-                        <>
-                          <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-                            AI-generated draft — edit HTML directly below
-                          </div>
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <label
-                              htmlFor="newsletter-html-raw"
-                              className="text-sm text-muted-foreground"
-                            >
-                              Email body (HTML)
-                            </label>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={handleOpenPresetModal}
-                                disabled={sendState.status === 'loading'}
-                              >
-                                Apply Preset
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={handlePreviewNewsletter}
-                                disabled={sendState.status === 'loading'}
-                              >
-                                Preview
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => void handleSaveHtmlDraftChanges()}
-                                disabled={sendState.status === 'loading'}
-                              >
-                                Save changes
-                              </Button>
-                            </div>
-                          </div>
-                          <textarea
-                            id="newsletter-html-raw"
-                            className="w-full min-h-[600px] resize-y overflow-auto rounded-md border border-input bg-background p-3 font-mono text-sm leading-relaxed whitespace-pre"
-                            style={{ height: '600px' }}
-                            value={rawHtmlContent}
-                            onChange={(event) => {
-                              const v = event.target.value;
-                              setRawHtmlContent(v);
-                              setPreviewHtml(v);
-                            }}
-                            spellCheck={false}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            {emailBodyStats.words} words •{' '}
-                            {emailBodyStats.characters} characters
-                          </p>
-                          <div className="border-t border-[var(--color-border)] pt-4">
-                            <div className="flex flex-wrap items-center justify-end gap-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                  onClick={handleOpenPresetModal}
-                                  disabled={sendState.status === 'loading'}
-                                >
-                                  Apply Preset
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                onClick={() => void handleSaveAsDraft()}
-                                disabled={sendState.status === 'loading'}
-                              >
-                                Save as Draft
-                              </Button>
-                              <Button
-                                type="button"
-                                onClick={handleSendNewsletter}
-                                disabled={sendState.status === 'loading'}
-                                className="bg-[#E53E3E] text-white hover:bg-[#c53030]"
-                              >
-                                {sendState.status === 'loading'
-                                  ? 'Sending...'
-                                  : 'Send Newsletter'}
-                              </Button>
-                            </div>
-                          </div>
-                        </>
-                      ) : (
-                        <>
+                      <>
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <label
                               htmlFor="newsletter-editor"
@@ -1999,7 +1767,6 @@ export default function DashboardClient({
                                 onClick={() =>
                                   setIsFullscreenEditor((value) => !value)
                                 }
-                                disabled={!editorReady}
                               >
                                 {isFullscreenEditor ? (
                                   <>
@@ -2017,10 +1784,7 @@ export default function DashboardClient({
                                 type="button"
                                 variant="outline"
                                 onClick={handlePreviewNewsletter}
-                                disabled={
-                                  !newsletterReady ||
-                                  sendState.status === 'loading'
-                                }
+                                disabled={sendState.status === 'loading'}
                               >
                                 Preview
                               </Button>
@@ -2028,10 +1792,7 @@ export default function DashboardClient({
                                 type="button"
                                 variant="outline"
                                 onClick={handleSaveDesign}
-                                disabled={
-                                  !newsletterReady ||
-                                  sendState.status === 'loading'
-                                }
+                                disabled={sendState.status === 'loading'}
                               >
                                 Save Design
                                 <span
@@ -2081,10 +1842,7 @@ export default function DashboardClient({
                                       type="button"
                                       variant="outline"
                                       onClick={handleSaveDesign}
-                                      disabled={
-                                        !newsletterReady ||
-                                        sendState.status === 'loading'
-                                      }
+                                      disabled={sendState.status === 'loading'}
                                     >
                                       Save Design
                                       <span
@@ -2100,10 +1858,7 @@ export default function DashboardClient({
                                       type="button"
                                       variant="outline"
                                       onClick={handleUploadDesignFromStorage}
-                                      disabled={
-                                        !newsletterReady ||
-                                        sendState.status === 'loading'
-                                      }
+                                      disabled={sendState.status === 'loading'}
                                     >
                                       Upload Design
                                     </Button>
@@ -2111,10 +1866,7 @@ export default function DashboardClient({
                                       type="button"
                                       variant="outline"
                                       onClick={handleUploadDesignClick}
-                                      disabled={
-                                        !newsletterReady ||
-                                        sendState.status === 'loading'
-                                      }
+                                      disabled={sendState.status === 'loading'}
                                     >
                                       Upload JSON
                                     </Button>
@@ -2122,10 +1874,7 @@ export default function DashboardClient({
                                       type="button"
                                       variant="outline"
                                       onClick={handleOpenPresetModal}
-                                      disabled={
-                                        !newsletterReady ||
-                                        sendState.status === 'loading'
-                                      }
+                                      disabled={sendState.status === 'loading'}
                                     >
                                       Apply Preset
                                     </Button>
@@ -2133,10 +1882,7 @@ export default function DashboardClient({
                                       type="button"
                                       variant="outline"
                                       onClick={handleDownloadDesign}
-                                      disabled={
-                                        !newsletterReady ||
-                                        sendState.status === 'loading'
-                                      }
+                                      disabled={sendState.status === 'loading'}
                                     >
                                       Download JSON
                                     </Button>
@@ -2144,10 +1890,7 @@ export default function DashboardClient({
                                       type="button"
                                       variant="outline"
                                       onClick={handlePreviewNewsletter}
-                                      disabled={
-                                        !newsletterReady ||
-                                        sendState.status === 'loading'
-                                      }
+                                      disabled={sendState.status === 'loading'}
                                     >
                                       Preview
                                     </Button>
@@ -2155,20 +1898,14 @@ export default function DashboardClient({
                                       type="button"
                                       variant="outline"
                                       onClick={() => void handleSaveAsDraft()}
-                                      disabled={
-                                        !newsletterReady ||
-                                        sendState.status === 'loading'
-                                      }
+                                      disabled={sendState.status === 'loading'}
                                     >
                                       Save as Draft
                                     </Button>
                                     <Button
                                       type="button"
                                       onClick={handleSendNewsletter}
-                                      disabled={
-                                        !newsletterReady ||
-                                        sendState.status === 'loading'
-                                      }
+                                      disabled={sendState.status === 'loading'}
                                       className="bg-[#E53E3E] text-white hover:bg-[#c53030]"
                                     >
                                       {sendState.status === 'loading'
@@ -2178,16 +1915,26 @@ export default function DashboardClient({
                                   </div>
                                 </div>
                               ) : null}
-                              <GrapesEditor
-                                ref={emailEditorRef}
-                                initialHtml={editorHtml}
-                                onChange={(html) => setPreviewHtml(html)}
-                                height={
-                                  isFullscreenEditor
-                                    ? 'calc(100vh - 130px)'
-                                    : '700px'
-                                }
-                              />
+                              <div className="grid gap-4 lg:grid-cols-2">
+                                <textarea
+                                  id="newsletter-editor"
+                                  className="w-full rounded-md border border-input bg-background p-3 font-mono text-sm leading-relaxed"
+                                  style={{ height: '700px' }}
+                                  value={editorHtml}
+                                  onChange={(event) => {
+                                    const value = event.target.value;
+                                    setEditorHtml(value);
+                                    setPreviewHtml(value);
+                                  }}
+                                  spellCheck={false}
+                                />
+                                <iframe
+                                  title="Live HTML preview"
+                                  className="w-full rounded-md border border-[var(--color-border)] bg-white"
+                                  style={{ height: '700px' }}
+                                  srcDoc={editorHtml}
+                                />
+                              </div>
                             </div>
                           </div>
                           <p className="text-xs text-muted-foreground">
@@ -2201,10 +1948,7 @@ export default function DashboardClient({
                                   type="button"
                                   variant="outline"
                                   onClick={handleUploadDesignFromStorage}
-                                  disabled={
-                                    !newsletterReady ||
-                                    sendState.status === 'loading'
-                                  }
+                                  disabled={sendState.status === 'loading'}
                                 >
                                   Upload Design
                                 </Button>
@@ -2212,10 +1956,7 @@ export default function DashboardClient({
                                   type="button"
                                   variant="outline"
                                   onClick={handleUploadDesignClick}
-                                  disabled={
-                                    !newsletterReady ||
-                                    sendState.status === 'loading'
-                                  }
+                                  disabled={sendState.status === 'loading'}
                                 >
                                   Upload JSON
                                 </Button>
@@ -2223,10 +1964,7 @@ export default function DashboardClient({
                                   type="button"
                                   variant="outline"
                                   onClick={handleOpenPresetModal}
-                                  disabled={
-                                    !newsletterReady ||
-                                    sendState.status === 'loading'
-                                  }
+                                  disabled={sendState.status === 'loading'}
                                 >
                                   Apply Preset
                                 </Button>
@@ -2234,10 +1972,7 @@ export default function DashboardClient({
                                   type="button"
                                   variant="outline"
                                   onClick={handleDownloadDesign}
-                                  disabled={
-                                    !newsletterReady ||
-                                    sendState.status === 'loading'
-                                  }
+                                  disabled={sendState.status === 'loading'}
                                 >
                                   Download JSON
                                 </Button>
@@ -2247,20 +1982,14 @@ export default function DashboardClient({
                                   type="button"
                                   variant="outline"
                                   onClick={() => void handleSaveAsDraft()}
-                                  disabled={
-                                    !newsletterReady ||
-                                    sendState.status === 'loading'
-                                  }
+                                  disabled={sendState.status === 'loading'}
                                 >
                                   Save as Draft
                                 </Button>
                                 <Button
                                   type="button"
                                   onClick={handleSendNewsletter}
-                                  disabled={
-                                    !newsletterReady ||
-                                    sendState.status === 'loading'
-                                  }
+                                  disabled={sendState.status === 'loading'}
                                   className="bg-[#E53E3E] text-white hover:bg-[#c53030]"
                                 >
                                   {sendState.status === 'loading'
@@ -2270,8 +1999,7 @@ export default function DashboardClient({
                               </div>
                             </div>
                           </div>
-                        </>
-                      )}
+                      </>
                     </div>
                     {sendState.status !== 'idle' ? (
                       <p
@@ -2410,9 +2138,9 @@ export default function DashboardClient({
                         type="button"
                         variant="default"
                         className="bg-[#E53E3E] text-white hover:bg-[#c53030]"
-                        onClick={handleEditPreviewInUnlayer}
+                        onClick={handleEditPreviewInEditor}
                       >
-                        Edit in Unlayer
+                        Edit in Editor
                       </Button>
                     ) : null}
                   </div>
