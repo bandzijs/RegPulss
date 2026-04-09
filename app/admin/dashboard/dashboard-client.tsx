@@ -20,6 +20,7 @@ import {
   YAxis,
 } from 'recharts';
 import {
+  Archive,
   BarChart3,
   Bolt,
   Expand,
@@ -158,6 +159,7 @@ function getTrend(growthData: GrowthPoint[]): { value: string; positive: boolean
 type SidebarSection =
   | 'dashboard'
   | 'drafts'
+  | 'archive'
   | 'subscribers'
   | 'newsletter'
   | 'settings';
@@ -169,6 +171,7 @@ const navItems: {
 }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
   { id: 'drafts', label: 'Drafts', icon: FileText },
+  { id: 'archive', label: 'Archive', icon: Archive },
   { id: 'subscribers', label: 'Subscribers', icon: Users },
   { id: 'newsletter', label: 'Newsletter Editor', icon: Mail },
   { id: 'settings', label: 'Settings', icon: Settings },
@@ -306,7 +309,7 @@ export default function DashboardClient({
   }, []);
 
   useEffect(() => {
-    if (activeSection === 'drafts') {
+    if (activeSection === 'drafts' || activeSection === 'archive') {
       void loadDraftsList();
     }
   }, [activeSection, loadDraftsList]);
@@ -320,6 +323,14 @@ export default function DashboardClient({
       entry.email.toLowerCase().includes(normalized)
     );
   }, [query, subscribers]);
+  const draftItems = useMemo(
+    () => drafts.filter((entry) => entry.status?.toLowerCase() === 'draft'),
+    [drafts]
+  );
+  const archivedItems = useMemo(
+    () => drafts.filter((entry) => entry.status?.toLowerCase() === 'archived'),
+    [drafts]
+  );
 
   const growthData = useMemo(
     () => createGrowthSeries(subscribers),
@@ -831,6 +842,64 @@ export default function DashboardClient({
     }
   }
 
+  async function handleArchiveDraft(draft: NewsletterDraft) {
+    const confirmed = window.confirm('Move to archive?');
+    if (!confirmed) {
+      return;
+    }
+
+    setDraftActionId(draft.id);
+    try {
+      const res = await fetch(`/api/drafts/${draft.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'archived' }),
+      });
+      const payload = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        showToast(setToast, payload.error ?? 'Failed to archive draft', 'error');
+        return;
+      }
+      showToast(setToast, 'Draft archived.', 'success');
+      if (editingDraftId === draft.id) {
+        setEditingDraftId(null);
+        setHtmlDraftMode(false);
+        setRawHtmlContent('');
+      }
+      void loadDraftsList();
+      void refreshDraftsCount();
+    } catch (error) {
+      console.error(error);
+      showToast(setToast, 'Failed to archive draft.', 'error');
+    } finally {
+      setDraftActionId(null);
+    }
+  }
+
+  async function handleRestoreDraft(draft: NewsletterDraft) {
+    setDraftActionId(draft.id);
+    try {
+      const res = await fetch(`/api/drafts/${draft.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'draft' }),
+      });
+      const payload = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        showToast(setToast, payload.error ?? 'Failed to restore draft', 'error');
+        return;
+      }
+      showToast(setToast, 'Draft restored.', 'success');
+      void loadDraftsList();
+      void refreshDraftsCount();
+    } catch (error) {
+      console.error(error);
+      showToast(setToast, 'Failed to restore draft.', 'error');
+    } finally {
+      setDraftActionId(null);
+    }
+  }
+
   async function handlePreviewDraftFromCard(draft: NewsletterDraft) {
     setDraftPreviewLoadingId(draft.id);
     try {
@@ -1119,40 +1188,35 @@ export default function DashboardClient({
                     <p className="text-sm text-muted-foreground">Loading drafts…</p>
                   ) : draftsError ? (
                     <p className="text-sm text-[#E53E3E]">{draftsError}</p>
-                  ) : drafts.length === 0 ? (
+                  ) : draftItems.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
                       No drafts yet. The AI bot will save drafts here automatically.
                     </p>
                   ) : (
-                    <div className="grid gap-4 md:grid-cols-2">
-                      {drafts.map((draft) => {
-                        const isDraft =
-                          (draft.status ?? '').toLowerCase() === 'draft';
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                      {draftItems.map((draft) => {
                         const busy = draftActionId === draft.id;
                         return (
                           <Card key={draft.id} className="border shadow-sm">
-                            <CardHeader className="pb-2">
+                            <CardHeader className="p-3 pb-2">
                               <div className="flex items-start justify-between gap-2">
-                                <CardTitle className="text-lg font-semibold leading-tight">
+                                <CardTitle className="text-sm font-semibold leading-tight">
                                   {draft.title || draft.subject || 'Untitled'}
                                 </CardTitle>
                                 <Badge
                                   className={cn(
-                                    'shrink-0 border-0',
-                                    isDraft
-                                      ? 'bg-yellow-100 text-yellow-900 hover:bg-yellow-100'
-                                      : 'bg-emerald-100 text-emerald-900 hover:bg-emerald-100'
+                                    'shrink-0 border-0 bg-yellow-100 text-yellow-900 hover:bg-yellow-100 text-[10px]'
                                   )}
                                 >
-                                  {isDraft ? 'Draft' : 'Sent'}
+                                  Draft
                                 </Badge>
                               </div>
-                              <CardDescription className="text-foreground/90">
+                              <CardDescription className="text-xs text-foreground/90">
                                 {draft.subject || '(No subject line)'}
                               </CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-3 text-sm">
-                              <p className="text-muted-foreground">
+                            <CardContent className="p-3 pt-0 space-y-2 text-xs">
+                              <p className="text-xs text-muted-foreground">
                                 Created {formatDate(draft.created_at)}
                               </p>
                               {draft.source_urls &&
@@ -1181,11 +1245,12 @@ export default function DashboardClient({
                                   </ul>
                                 </div>
                               ) : null}
-                              <div className="flex flex-wrap gap-2 pt-1">
+                              <div className="flex flex-wrap gap-1.5 pt-1">
                                 <Button
                                   type="button"
                                   variant="outline"
                                   size="sm"
+                                  className="text-xs h-8"
                                   disabled={busy}
                                   onClick={() => handleEditDraft(draft)}
                                 >
@@ -1195,6 +1260,7 @@ export default function DashboardClient({
                                   type="button"
                                   variant="outline"
                                   size="sm"
+                                  className="text-xs h-8"
                                   disabled={
                                     busy || draftPreviewLoadingId === draft.id
                                   }
@@ -1205,8 +1271,8 @@ export default function DashboardClient({
                                 <Button
                                   type="button"
                                   size="sm"
-                                  disabled={busy || !isDraft}
-                                  className="bg-[#E53E3E] text-white hover:bg-[#c53030]"
+                                  disabled={busy}
+                                  className="bg-[#E53E3E] text-white hover:bg-[#c53030] text-xs h-8"
                                   onClick={() => void handleSendDraft(draft)}
                                 >
                                   Send
@@ -1215,9 +1281,19 @@ export default function DashboardClient({
                                   type="button"
                                   variant="outline"
                                   size="sm"
+                                  className="text-xs h-8 text-gray-700"
+                                  disabled={busy}
+                                  onClick={() => void handleArchiveDraft(draft)}
+                                >
+                                  Archive
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-xs h-8 text-[#E53E3E] border-[#fecaca]"
                                   disabled={busy}
                                   onClick={() => void handleDeleteDraft(draft)}
-                                  className="text-[#E53E3E] border-[#fecaca]"
                                 >
                                   <Trash2 className="h-4 w-4 mr-1" />
                                   Delete
@@ -1227,6 +1303,83 @@ export default function DashboardClient({
                           </Card>
                         );
                       })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          ) : null}
+
+          {activeSection === 'archive' ? (
+            <div className="mt-4 space-y-4">
+              <Card className="shadow-sm">
+                <CardHeader>
+                  <CardTitle>Archive</CardTitle>
+                  <CardDescription>Archived newsletters.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {draftsLoading ? (
+                    <p className="text-sm text-muted-foreground">Loading archive…</p>
+                  ) : draftsError ? (
+                    <p className="text-sm text-[#E53E3E]">{draftsError}</p>
+                  ) : archivedItems.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No archived newsletters yet.
+                    </p>
+                  ) : (
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Title</TableHead>
+                            <TableHead>Subject</TableHead>
+                            <TableHead>Created Date</TableHead>
+                            <TableHead>Sources count</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {archivedItems.map((draft) => {
+                            const busy = draftActionId === draft.id;
+                            return (
+                              <TableRow key={draft.id}>
+                                <TableCell className="font-medium">
+                                  {draft.title || 'Untitled'}
+                                </TableCell>
+                                <TableCell>{draft.subject || '(No subject)'}</TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {formatDate(draft.created_at)}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {draft.source_urls?.filter(Boolean).length ?? 0}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex flex-wrap gap-2">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      disabled={busy}
+                                      onClick={() => void handlePreviewDraftFromCard(draft)}
+                                    >
+                                      View
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      disabled={busy}
+                                      onClick={() => void handleRestoreDraft(draft)}
+                                    >
+                                      Restore
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
                     </div>
                   )}
                 </CardContent>
