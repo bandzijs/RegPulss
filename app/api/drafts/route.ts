@@ -23,40 +23,29 @@ export async function OPTIONS() {
   });
 }
 
+async function querySupabase(query: string) {
+  const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/${query}`;
+  const response = await fetch(url, {
+    headers: {
+      apikey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}`,
+      'Content-Type': 'application/json',
+    },
+    cache: 'no-store',
+  });
+  return response.json();
+}
+
 export async function GET(request: NextRequest) {
   void request;
   try {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!url || !key) {
-      console.error('Missing env vars:', { url: !!url, key: !!key });
-      return NextResponse.json({ drafts: [] });
-    }
-
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(url, key, {
-      auth: { persistSession: false },
-    });
-
-    const { data, error } = await supabase
-      .from('newsletters')
-      .select(
-        'id, title, subject, status, source_urls, created_at, sent_at, html_content, json_content'
-      )
-      .order('created_at', { ascending: false })
-      .limit(50);
-
-    if (error) {
-      console.error('Supabase error:', error.message);
-      return NextResponse.json({ drafts: [] });
-    }
-
-    console.log('GET /api/drafts success:', data?.length, 'rows');
-    return NextResponse.json({ drafts: data ?? [] });
+    const data = await querySupabase(
+      'newsletters?select=id,title,subject,status,source_urls,created_at,sent_at,html_content,json_content&order=created_at.desc&limit=50'
+    );
+    return NextResponse.json({ drafts: Array.isArray(data) ? data : [] });
   } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    console.error('GET /api/drafts crashed:', errorMessage);
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('GET /api/drafts error:', message);
     return NextResponse.json({ drafts: [] });
   }
 }
