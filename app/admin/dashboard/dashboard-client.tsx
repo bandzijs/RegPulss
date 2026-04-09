@@ -10,6 +10,7 @@ import {
   type Dispatch,
   type SetStateAction,
 } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import {
   Area,
@@ -56,6 +57,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+
+const GrapesEditor = dynamic(() => import('./grapes-editor'), { ssr: false });
 
 interface Subscriber {
   id: string;
@@ -410,6 +413,7 @@ export default function DashboardClient({
   );
   const [previewViewport, setPreviewViewport] = useState<PreviewViewport>('desktop');
   const [editorHtml, setEditorHtml] = useState('');
+  const [editorMountNonce, setEditorMountNonce] = useState(0);
   const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<NewsletterDraft[]>([]);
   const [draftsLoading, setDraftsLoading] = useState(false);
@@ -434,6 +438,12 @@ export default function DashboardClient({
     message: string;
   }>({ status: 'idle', message: '' });
   const uploadHtmlInputRef = useRef<HTMLInputElement | null>(null);
+
+  function pushEditorContent(html: string) {
+    setEditorHtml(html);
+    setPreviewHtml(html);
+    setEditorMountNonce((n) => n + 1);
+  }
 
   useEffect(() => {
     setPendingDraftsCount(draftsCountProp);
@@ -620,8 +630,7 @@ export default function DashboardClient({
         return;
       }
 
-      setEditorHtml(raw);
-      setPreviewHtml(raw);
+      pushEditorContent(raw);
       setSendState({
         status: 'success',
         message: 'Saved HTML design loaded.',
@@ -671,8 +680,7 @@ export default function DashboardClient({
 
     try {
       const content = await file.text();
-      setEditorHtml(content);
-      setPreviewHtml(content);
+      pushEditorContent(content);
       window.localStorage.setItem(NEWSLETTER_DESIGN_KEY, content);
       setSendState({
         status: 'success',
@@ -721,8 +729,7 @@ export default function DashboardClient({
 
   function handleApplyPreset(key: PresetKey) {
     const preset = getPresetByKey(key);
-    setEditorHtml(preset.html);
-    setPreviewHtml(preset.html);
+    pushEditorContent(preset.html);
     setIsPresetModalOpen(false);
     showToast(setToast, `${preset.title} preset applied.`, 'success');
   }
@@ -753,7 +760,7 @@ export default function DashboardClient({
     const plain = extractPlainTextFromHtml(draft.html_content ?? '');
     setSubject(draft.subject ?? '');
     setEditingDraftId(draft.id);
-    setEditorHtml(PRESET_STANDARD_HTML);
+    pushEditorContent(PRESET_STANDARD_HTML);
     setShowPasteInfoBanner(true);
     setEditorInfoBanner('Paste your copied content into the blocks below');
     setReferencePanelSections(splitDraftIntoSections(plain));
@@ -771,8 +778,7 @@ export default function DashboardClient({
     const html = draft.html_content?.trim()
       ? draft.html_content
       : PRESET_STANDARD_HTML;
-    setEditorHtml(html ?? PRESET_STANDARD_HTML);
-    setPreviewHtml(html ?? '');
+    pushEditorContent(html ?? PRESET_STANDARD_HTML);
     setActiveSection('newsletter');
   }
 
@@ -927,7 +933,7 @@ export default function DashboardClient({
       showToast(setToast, 'Draft deleted.', 'success');
       if (editingDraftId === draft.id) {
         setEditingDraftId(null);
-        setEditorHtml('');
+        pushEditorContent('');
       }
       void loadDraftsList();
       void refreshDraftsCount();
@@ -960,7 +966,7 @@ export default function DashboardClient({
       showToast(setToast, 'Draft archived.', 'success');
       if (editingDraftId === draft.id) {
         setEditingDraftId(null);
-        setEditorHtml('');
+        pushEditorContent('');
       }
       void loadDraftsList();
       void refreshDraftsCount();
@@ -1043,8 +1049,7 @@ export default function DashboardClient({
     setReferencePanelSections([]);
     setSubject(previewSourceDraft.subject ?? '');
     setEditingDraftId(previewSourceDraft.id);
-    setEditorHtml(html);
-    setPreviewHtml(html);
+    pushEditorContent(html);
     setActiveSection('newsletter');
   }
 
@@ -1915,24 +1920,19 @@ export default function DashboardClient({
                                   </div>
                                 </div>
                               ) : null}
-                              <div className="grid gap-4 lg:grid-cols-2">
-                                <textarea
-                                  id="newsletter-editor"
-                                  className="w-full rounded-md border border-input bg-background p-3 font-mono text-sm leading-relaxed"
-                                  style={{ height: '700px' }}
-                                  value={editorHtml}
-                                  onChange={(event) => {
-                                    const value = event.target.value;
-                                    setEditorHtml(value);
-                                    setPreviewHtml(value);
+                              <div className="w-full min-h-[500px]">
+                                <GrapesEditor
+                                  key={`${editingDraftId ?? 'new'}-${editorMountNonce}`}
+                                  initialHtml={editorHtml}
+                                  onChange={(html) => {
+                                    setEditorHtml(html);
+                                    setPreviewHtml(html);
                                   }}
-                                  spellCheck={false}
-                                />
-                                <iframe
-                                  title="Live HTML preview"
-                                  className="w-full rounded-md border border-[var(--color-border)] bg-white"
-                                  style={{ height: '700px' }}
-                                  srcDoc={editorHtml}
+                                  height={
+                                    isFullscreenEditor
+                                      ? 'calc(100vh - 130px)'
+                                      : '700px'
+                                  }
                                 />
                               </div>
                             </div>
