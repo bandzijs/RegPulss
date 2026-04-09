@@ -54,9 +54,9 @@ function getPresetPlugin(): unknown {
   return undefined;
 }
 
-const GJS_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/grapesjs/0.22.14/css/grapes.min.css';
-const GJS_JS =
-  'https://cdnjs.cloudflare.com/ajax/libs/grapesjs/0.22.14/grapes.min.js';
+const GJS_CSS =
+  'https://unpkg.com/grapesjs@0.22.14/dist/css/grapes.min.css';
+const GJS_JS = 'https://unpkg.com/grapesjs@0.22.14/dist/grapes.min.js';
 const PRESET_JS =
   'https://unpkg.com/grapesjs-preset-newsletter@1.0.2/dist/index.js';
 
@@ -144,7 +144,7 @@ export default function GrapesEditor({
       await loadScript(PRESET_JS, 'grapesjs-newsletter-script');
       setTimeout(() => {
         initEditor();
-      }, 300);
+      }, 500);
     };
 
     void run();
