@@ -304,6 +304,55 @@ const PRESET_PROFESSIONAL_DESIGN = {
 
 type PresetKey = 'standard' | 'minimal' | 'professional';
 
+function extractPlainTextFromHtml(html: string): string {
+  if (!html.trim()) {
+    return '';
+  }
+  const container = document.createElement('div');
+  container.innerHTML = html;
+  return (container.textContent || container.innerText || '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/\s+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function splitDraftIntoSections(text: string): string[] {
+  const normalized = text.trim();
+  if (!normalized) {
+    return [];
+  }
+
+  const doubleNewlineSplit = normalized
+    .split(/\n\s*\n+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (doubleNewlineSplit.length > 1) {
+    return doubleNewlineSplit;
+  }
+
+  const numberedSplit = normalized
+    .split(/(?=\n?\d+\.\s+)/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (numberedSplit.length > 1) {
+    return numberedSplit;
+  }
+
+  const bulletSplit = normalized
+    .split(/(?=\n?[•\-]\s+)/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (bulletSplit.length > 1) {
+    return bulletSplit;
+  }
+
+  return [normalized];
+}
+
 function sidebarInitials(email: string): string {
   return email.slice(0, 2).toUpperCase();
 }
@@ -374,6 +423,12 @@ export default function DashboardClient({
   const [isFullscreenEditor, setIsFullscreenEditor] = useState(false);
   const [htmlDraftMode, setHtmlDraftMode] = useState(false);
   const [rawHtmlContent, setRawHtmlContent] = useState('');
+  const [showPasteInfoBanner, setShowPasteInfoBanner] = useState(false);
+  const [referencePanelSections, setReferencePanelSections] = useState<string[]>([]);
+  const [isReferencePanelOpen, setIsReferencePanelOpen] = useState(true);
+  const [pendingPresetToLoad, setPendingPresetToLoad] = useState<PresetKey | null>(
+    null
+  );
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
   const [isDesignSaved, setIsDesignSaved] = useState(false);
   const [sendState, setSendState] = useState<{
@@ -709,6 +764,56 @@ export default function DashboardClient({
     showToast(setToast, `${preset.title} preset applied.`, 'success');
   }
 
+  useEffect(() => {
+    if (!pendingPresetToLoad || !editorReady || htmlDraftMode) {
+      return;
+    }
+    const preset = getPresetByKey(pendingPresetToLoad);
+    if (emailEditorRef.current) {
+      emailEditorRef.current.loadDesign(preset.design);
+      setIsDesignSaved(false);
+      setPendingPresetToLoad(null);
+    }
+  }, [pendingPresetToLoad, editorReady, htmlDraftMode]);
+
+  async function copyTextToClipboard(text: string, successMessage: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast(setToast, successMessage, 'success');
+    } catch (error) {
+      console.error(error);
+      showToast(setToast, 'Failed to copy content.', 'error');
+    }
+  }
+
+  async function handleCopyDraftContent(draft: NewsletterDraft) {
+    const plain = extractPlainTextFromHtml(draft.html_content ?? '');
+    if (!plain) {
+      showToast(setToast, 'No content to copy.', 'error');
+      return;
+    }
+    await copyTextToClipboard(
+      plain,
+      'Content copied! Paste it into the Newsletter Editor'
+    );
+  }
+
+  function handleOpenDraftInEditor(draft: NewsletterDraft) {
+    const plain = extractPlainTextFromHtml(draft.html_content ?? '');
+    setSubject(draft.subject ?? '');
+    setEditingDraftId(draft.id);
+    setHtmlDraftMode(false);
+    setRawHtmlContent('');
+    setEditorReady(false);
+    setInitialDesign(undefined);
+    setEditorDesignKey((k) => k + 1);
+    setPendingPresetToLoad('standard');
+    setShowPasteInfoBanner(true);
+    setReferencePanelSections(splitDraftIntoSections(plain));
+    setIsReferencePanelOpen(true);
+    setActiveSection('newsletter');
+  }
+
   function handleEditDraft(draft: NewsletterDraft) {
     setSubject(draft.subject ?? '');
     setEditingDraftId(draft.id);
@@ -718,12 +823,16 @@ export default function DashboardClient({
     if (draftHasJsonContent(draft.json_content)) {
       setHtmlDraftMode(false);
       setRawHtmlContent('');
+      setShowPasteInfoBanner(false);
+      setReferencePanelSections([]);
       setEditorReady(false);
       setInitialDesign(draft.json_content as object);
       setEditorDesignKey((k) => k + 1);
       setPreviewHtml(draft.html_content ?? '');
     } else {
       setHtmlDraftMode(true);
+      setShowPasteInfoBanner(false);
+      setReferencePanelSections([]);
       setEditorReady(false);
       setInitialDesign(undefined);
       const html = draft.html_content ?? '';
@@ -1382,6 +1491,7 @@ export default function DashboardClient({
                   ) : (
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                       {draftItems.map((draft) => {
+                        const isBotDraft = !draftHasJsonContent(draft.json_content);
                         const busy = draftActionId === draft.id;
                         return (
                           <Card key={draft.id} className="border shadow-sm">
@@ -1433,6 +1543,18 @@ export default function DashboardClient({
                                 </div>
                               ) : null}
                               <div className="flex flex-wrap gap-1.5 pt-1">
+                                {isBotDraft ? (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-xs h-8"
+                                    disabled={busy}
+                                    onClick={() => void handleCopyDraftContent(draft)}
+                                  >
+                                    Copy Content
+                                  </Button>
+                                ) : null}
                                 <Button
                                   type="button"
                                   variant="outline"
@@ -1443,6 +1565,18 @@ export default function DashboardClient({
                                 >
                                   Edit
                                 </Button>
+                                {isBotDraft ? (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-xs h-8"
+                                    disabled={busy}
+                                    onClick={() => handleOpenDraftInEditor(draft)}
+                                  >
+                                    Open in Editor
+                                  </Button>
+                                ) : null}
                                 <Button
                                   type="button"
                                   variant="outline"
@@ -1736,6 +1870,73 @@ export default function DashboardClient({
                       />
                     </div>
                     <div className="w-full space-y-2">
+                      {!editingDraftId ? (
+                        <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                          <p className="font-medium">Start from scratch or load a draft from the Drafts section.</p>
+                          <p className="mt-1 text-xs text-slate-600">
+                            Tip: Use &quot;Open in Editor&quot; on an AI draft to get started quickly.
+                          </p>
+                        </div>
+                      ) : null}
+
+                      {!htmlDraftMode && showPasteInfoBanner ? (
+                        <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                          Paste your copied content into the blocks below
+                        </div>
+                      ) : null}
+
+                      {!htmlDraftMode && referencePanelSections.length > 0 ? (
+                        <div className="rounded-md border border-slate-200 bg-slate-50">
+                          <div className="flex items-center justify-between gap-2 px-4 py-3">
+                            <p className="text-sm font-medium">
+                              📋 AI Draft Content — copy sections below into the editor
+                            </p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                setIsReferencePanelOpen((value) => !value)
+                              }
+                            >
+                              {isReferencePanelOpen ? 'Hide' : 'Show'}
+                            </Button>
+                          </div>
+                          {isReferencePanelOpen ? (
+                            <div className="space-y-2 border-t border-slate-200 px-4 py-3">
+                              {referencePanelSections.map((section, index) => (
+                                <div
+                                  key={`reference-section-${index}`}
+                                  className="rounded-md border bg-white p-3"
+                                >
+                                  <div className="mb-2 flex items-center justify-between gap-2">
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                      Section {index + 1}
+                                    </p>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() =>
+                                        void copyTextToClipboard(
+                                          section,
+                                          'Section copied to clipboard.'
+                                        )
+                                      }
+                                    >
+                                      Copy
+                                    </Button>
+                                  </div>
+                                  <p className="whitespace-pre-wrap text-xs leading-relaxed">
+                                    {section}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+
                       {htmlDraftMode ? (
                         <>
                           <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
