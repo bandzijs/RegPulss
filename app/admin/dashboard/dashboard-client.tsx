@@ -505,43 +505,46 @@ export default function DashboardClient({
   const loadDraftsList = useCallback(async () => {
     setDraftsLoading(true);
     setDraftsError(null);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
     try {
-      const res = await fetch('/api/drafts');
-      const payload = (await res.json()) as unknown;
-      console.log('drafts response:', payload);
+      const res = await fetch('/api/drafts', { signal: controller.signal });
+      clearTimeout(timeout);
+      const data = (await res.json()) as unknown;
+      console.log('drafts loaded:', data);
 
       if (!res.ok) {
         const apiError =
-          typeof payload === 'object' &&
-          payload !== null &&
-          'error' in payload &&
-          typeof (payload as { error?: unknown }).error === 'string'
-            ? (payload as { error: string }).error
+          typeof data === 'object' &&
+          data !== null &&
+          'error' in data &&
+          typeof (data as { error?: unknown }).error === 'string'
+            ? (data as { error: string }).error
             : 'Failed to load drafts';
         setDraftsError(apiError);
+        setDrafts([]);
         return;
       }
 
-      if (Array.isArray(payload)) {
-        setDrafts(payload as NewsletterDraft[]);
-        return;
-      }
+      const normalized = (
+        (typeof data === 'object' &&
+        data !== null &&
+        'drafts' in data &&
+        Array.isArray((data as { drafts?: unknown }).drafts)
+          ? (data as { drafts: NewsletterDraft[] }).drafts
+          : Array.isArray(data)
+            ? (data as NewsletterDraft[])
+            : []) ?? []
+      ) as NewsletterDraft[];
 
-      if (
-        typeof payload === 'object' &&
-        payload !== null &&
-        'drafts' in payload &&
-        Array.isArray((payload as { drafts?: unknown }).drafts)
-      ) {
-        setDrafts((payload as { drafts: NewsletterDraft[] }).drafts);
-        return;
-      }
-
-      setDraftsError('Unexpected drafts response format');
+      setDrafts(normalized);
     } catch (e) {
-      console.error('Failed to fetch drafts:', e);
+      clearTimeout(timeout);
+      console.error('fetchDrafts error:', e);
+      setDrafts([]);
       setDraftsError('Failed to load drafts');
     } finally {
+      clearTimeout(timeout);
       setDraftsLoading(false);
     }
   }, []);
