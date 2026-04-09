@@ -27,6 +27,7 @@ import {
   FileText,
   Mail,
   Monitor,
+  Send,
   Settings,
   Smartphone,
   Trash2,
@@ -160,6 +161,7 @@ type SidebarSection =
   | 'dashboard'
   | 'drafts'
   | 'archive'
+  | 'sent'
   | 'subscribers'
   | 'newsletter'
   | 'settings';
@@ -172,6 +174,7 @@ const navItems: {
   { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
   { id: 'drafts', label: 'Drafts', icon: FileText },
   { id: 'archive', label: 'Archive', icon: Archive },
+  { id: 'sent', label: 'Sent', icon: Send },
   { id: 'subscribers', label: 'Subscribers', icon: Users },
   { id: 'newsletter', label: 'Newsletter Editor', icon: Mail },
   { id: 'settings', label: 'Settings', icon: Settings },
@@ -309,7 +312,11 @@ export default function DashboardClient({
   }, []);
 
   useEffect(() => {
-    if (activeSection === 'drafts' || activeSection === 'archive') {
+    if (
+      activeSection === 'drafts' ||
+      activeSection === 'archive' ||
+      activeSection === 'sent'
+    ) {
       void loadDraftsList();
     }
   }, [activeSection, loadDraftsList]);
@@ -329,6 +336,10 @@ export default function DashboardClient({
   );
   const archivedItems = useMemo(
     () => drafts.filter((entry) => entry.status?.toLowerCase() === 'archived'),
+    [drafts]
+  );
+  const sentItems = useMemo(
+    () => drafts.filter((entry) => entry.status?.toLowerCase() === 'sent'),
     [drafts]
   );
 
@@ -1069,6 +1080,10 @@ export default function DashboardClient({
                   <Badge className="shrink-0 border-0 bg-yellow-500 text-gray-950 hover:bg-yellow-500">
                     {pendingDraftsCount}
                   </Badge>
+                ) : id === 'sent' && sentItems.length > 0 ? (
+                  <Badge className="shrink-0 border-0 bg-emerald-500 text-white hover:bg-emerald-500">
+                    {sentItems.length}
+                  </Badge>
                 ) : null}
               </button>
             ))}
@@ -1372,6 +1387,83 @@ export default function DashboardClient({
                                       onClick={() => void handleRestoreDraft(draft)}
                                     >
                                       Restore
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          ) : null}
+
+          {activeSection === 'sent' ? (
+            <div className="mt-4 space-y-4">
+              <Card className="shadow-sm">
+                <CardHeader>
+                  <CardTitle>Sent</CardTitle>
+                  <CardDescription>Previously sent newsletters.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {draftsLoading ? (
+                    <p className="text-sm text-muted-foreground">Loading sent newsletters…</p>
+                  ) : draftsError ? (
+                    <p className="text-sm text-[#E53E3E]">{draftsError}</p>
+                  ) : sentItems.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No sent newsletters yet.
+                    </p>
+                  ) : (
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Title</TableHead>
+                            <TableHead>Subject</TableHead>
+                            <TableHead>Sent Date</TableHead>
+                            <TableHead>Sources count</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {sentItems.map((draft) => {
+                            const busy = draftActionId === draft.id;
+                            return (
+                              <TableRow key={draft.id}>
+                                <TableCell className="font-medium">
+                                  {draft.title || 'Untitled'}
+                                </TableCell>
+                                <TableCell>{draft.subject || '(No subject)'}</TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {draft.sent_at ? formatDate(draft.sent_at) : '—'}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {draft.source_urls?.filter(Boolean).length ?? 0}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex flex-wrap gap-2">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      disabled={busy}
+                                      onClick={() => void handlePreviewDraftFromCard(draft)}
+                                    >
+                                      View
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      disabled={busy}
+                                      onClick={() => void handleArchiveDraft(draft)}
+                                    >
+                                      Archive
                                     </Button>
                                   </div>
                                 </TableCell>
