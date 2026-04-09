@@ -419,6 +419,10 @@ function hasBotDraftContent(json: unknown): boolean {
   return Object.keys(json as Record<string, unknown>).length === 0;
 }
 
+function normalizeStatus(status: string | null | undefined): string {
+  return (status ?? '').trim().toLowerCase();
+}
+
 export default function DashboardClient({
   userEmail,
   subscribers,
@@ -488,7 +492,9 @@ export default function DashboardClient({
       if (!res.ok || !payload.drafts) {
         return;
       }
-      const pending = payload.drafts.filter((d) => d.status === 'draft').length;
+      const pending = payload.drafts.filter(
+        (d) => normalizeStatus(d.status) === 'draft'
+      ).length;
       setPendingDraftsCount(pending);
       router.refresh();
     } catch {
@@ -502,6 +508,7 @@ export default function DashboardClient({
     try {
       const res = await fetch('/api/drafts');
       const payload = (await res.json()) as unknown;
+      console.log('drafts response:', payload);
 
       if (!res.ok) {
         const apiError =
@@ -559,15 +566,15 @@ export default function DashboardClient({
     );
   }, [query, subscribers]);
   const draftItems = useMemo(
-    () => drafts.filter((entry) => entry.status?.toLowerCase() === 'draft'),
+    () => drafts.filter((entry) => normalizeStatus(entry.status) === 'draft'),
     [drafts]
   );
   const archivedItems = useMemo(
-    () => drafts.filter((entry) => entry.status?.toLowerCase() === 'archived'),
+    () => drafts.filter((entry) => normalizeStatus(entry.status) === 'archived'),
     [drafts]
   );
   const sentItems = useMemo(
-    () => drafts.filter((entry) => entry.status?.toLowerCase() === 'sent'),
+    () => drafts.filter((entry) => normalizeStatus(entry.status) === 'sent'),
     [drafts]
   );
 
