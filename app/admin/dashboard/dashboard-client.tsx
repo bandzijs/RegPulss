@@ -10,6 +10,7 @@ import {
   type Dispatch,
   type SetStateAction,
 } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import {
   Area,
@@ -56,7 +57,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import GrapesEditor, { type GrapesEditorHandle } from './grapes-editor';
+import type { GrapesEditorHandle } from './grapes-editor';
+
+const GrapesEditor = dynamic(() => import('./grapes-editor'), { ssr: false });
 
 interface Subscriber {
   id: string;

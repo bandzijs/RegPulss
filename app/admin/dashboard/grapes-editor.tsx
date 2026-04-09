@@ -2,8 +2,6 @@
 
 import 'grapesjs/dist/css/grapes.min.css';
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
-import grapesjs, { type Editor } from 'grapesjs';
-import presetNewsletter from 'grapesjs-preset-newsletter';
 
 export interface GrapesEditorProps {
   initialHtml?: string;
@@ -18,66 +16,95 @@ export interface GrapesEditorHandle {
   setHtml: (html: string) => void;
 }
 
+interface GrapesEditorInstance {
+  setComponents: (html: string) => void;
+  setStyle: (css: string) => void;
+  getHtml: () => string;
+  getCss: () => string | undefined;
+  on: (event: string, callback: () => void) => void;
+  destroy: () => void;
+}
+
 const GrapesEditor = forwardRef<GrapesEditorHandle, GrapesEditorProps>(
   function GrapesEditor(
     { initialHtml = '', initialCss = '', onReady, onChange, height = '700px' },
     ref
   ) {
     const containerRef = useRef<HTMLDivElement | null>(null);
-    const editorRef = useRef<Editor | null>(null);
+    const editorRef = useRef<GrapesEditorInstance | null>(null);
 
     useEffect(() => {
       if (!containerRef.current || editorRef.current) {
         return;
       }
+      let isCancelled = false;
 
-      const editor = grapesjs.init({
-        container: containerRef.current,
-        plugins: [presetNewsletter],
-        pluginsOpts: {
-          [presetNewsletter as unknown as string]: {
-            modalLabelImport: 'Paste your HTML here',
-            modalLabelExport: 'Copy this code',
-            codeViewerTheme: 'material',
-            importPlaceholder: '<table>...</table>',
-            inlineCss: true,
-            cellStyle: {
-              'font-size': '14px',
-              'font-weight': 300,
-              'vertical-align': 'top',
-              color: 'rgb(111, 119, 125)',
-              margin: 0,
-              padding: 0,
+      (async () => {
+        try {
+          const [{ default: grapesjs }, { default: presetNewsletter }] =
+            await Promise.all([
+              import('grapesjs'),
+              import('grapesjs-preset-newsletter'),
+            ]);
+
+          if (isCancelled || !containerRef.current) {
+            return;
+          }
+
+          const editor = grapesjs.init({
+            container: containerRef.current,
+            plugins: [presetNewsletter],
+            pluginsOpts: {
+              [presetNewsletter as unknown as string]: {
+                modalLabelImport: 'Paste your HTML here',
+                modalLabelExport: 'Copy this code',
+                codeViewerTheme: 'material',
+                importPlaceholder: '<table>...</table>',
+                inlineCss: true,
+                cellStyle: {
+                  'font-size': '14px',
+                  'font-weight': 300,
+                  'vertical-align': 'top',
+                  color: 'rgb(111, 119, 125)',
+                  margin: 0,
+                  padding: 0,
+                },
+              },
             },
-          },
-        },
-        storageManager: false,
-        height,
-        width: '100%',
-      });
+            storageManager: false,
+            height,
+            width: '100%',
+          });
 
-      editorRef.current = editor;
+          editorRef.current = editor;
 
-      if (initialHtml) {
-        editor.setComponents(initialHtml);
-      }
-      if (initialCss) {
-        editor.setStyle(initialCss);
-      }
+          if (initialHtml) {
+            editor.setComponents(initialHtml);
+          }
+          if (initialCss) {
+            editor.setStyle(initialCss);
+          }
 
-      editor.on('update', () => {
-        if (!onChange) {
-          return;
+          editor.on('update', () => {
+            if (!onChange) {
+              return;
+            }
+            const html = `${editor.getHtml()}<style>${editor.getCss() ?? ''}</style>`;
+            onChange(html);
+          });
+
+          onReady?.();
+        } catch (error) {
+          console.error('Failed to initialize GrapesJS editor:', error);
         }
-        const html = `${editor.getHtml()}<style>${editor.getCss()}</style>`;
-        onChange(html);
-      });
-
-      onReady?.();
+      })();
 
       return () => {
-        editor.destroy();
-        editorRef.current = null;
+        isCancelled = true;
+        if (editorRef.current) {
+          editorRef.current.destroy();
+          editorRef.current = null;
+        }
       };
     }, [height, initialCss, initialHtml, onChange, onReady]);
 
@@ -98,7 +125,7 @@ const GrapesEditor = forwardRef<GrapesEditorHandle, GrapesEditorProps>(
         if (!editor) {
           throw new Error('GrapesJS editor is not ready');
         }
-        return `${editor.getHtml()}<style>${editor.getCss()}</style>`;
+        return `${editor.getHtml()}<style>${editor.getCss() ?? ''}</style>`;
       },
       setHtml(html: string) {
         const editor = editorRef.current;
