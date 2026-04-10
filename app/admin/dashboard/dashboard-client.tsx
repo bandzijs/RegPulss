@@ -58,7 +58,15 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 
-const GrapesEditor = dynamic(() => import('./grapes-editor'), { ssr: false });
+const GrapesEditor = dynamic(() => import('./email-editor'), {
+  ssr: false,
+  loading: () => (
+    <div style={{ height: '700px', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', color: '#999', fontFamily: 'Inter, sans-serif' }}>
+      Loading editor…
+    </div>
+  ),
+});
 
 interface Subscriber {
   id: string;
