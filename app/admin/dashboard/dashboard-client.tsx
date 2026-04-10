@@ -10,7 +10,6 @@ import {
   type Dispatch,
   type SetStateAction,
 } from 'react';
-import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import {
   Area,
@@ -57,16 +56,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-
-const GrapesEditor = dynamic(() => import('./email-editor'), {
-  ssr: false,
-  loading: () => (
-    <div style={{ height: '700px', display: 'flex', alignItems: 'center',
-      justifyContent: 'center', color: '#999', fontFamily: 'Inter, sans-serif' }}>
-      Loading editor…
-    </div>
-  ),
-});
+import DashboardEmailEditor, { type EmailEditorHandle } from './email-editor';
 
 interface Subscriber {
   id: string;
@@ -314,6 +304,38 @@ const PRESET_PROFESSIONAL_DESIGN = {
 
 type PresetKey = 'standard' | 'minimal' | 'professional';
 
+function convertHtmlToUnlayerDesign(html: string): object {
+  return {
+    body: {
+      rows: [
+        {
+          cells: [1],
+          columns: [
+            {
+              contents: [
+                {
+                  type: 'html',
+                  values: {
+                    html,
+                    containerPadding: '0px',
+                  },
+                },
+              ],
+            },
+          ],
+          values: {
+            backgroundColor: '#ffffff',
+          },
+        },
+      ],
+      values: {
+        backgroundColor: '#f4f4f4',
+        contentWidth: '600px',
+      },
+    },
+  };
+}
+
 function extractPlainTextFromHtml(html: string): string {
   if (!html.trim()) {
     return '';
@@ -387,18 +409,14 @@ function showToast(
   setToast({ message, type });
 }
 
-function hasBotDraftContent(json: unknown): boolean {
+function draftHasJsonContent(json: unknown): boolean {
   if (json == null) {
-    return true;
+    return false;
   }
   if (typeof json !== 'object' || Array.isArray(json)) {
-    return true;
+    return false;
   }
-  return Object.keys(json as Record<string, unknown>).length === 0;
-}
-
-function normalizeStatus(status: string | null | undefined): string {
-  return (status ?? '').trim().toLowerCase();
+  return Object.keys(json as Record<string, unknown>).length > 0;
 }
 
 export default function DashboardClient({
@@ -420,8 +438,11 @@ export default function DashboardClient({
     null
   );
   const [previewViewport, setPreviewViewport] = useState<PreviewViewport>('desktop');
-  const [editorHtml, setEditorHtml] = useState('');
-  const [editorMountNonce, setEditorMountNonce] = useState(0);
+  const [editorReady, setEditorReady] = useState(false);
+  const [initialDesign, setInitialDesign] = useState<object | undefined>(
+    undefined
+  );
+  const [editorDesignKey, setEditorDesignKey] = useState(0);
   const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<NewsletterDraft[]>([]);
   const [draftsLoading, setDraftsLoading] = useState(false);
@@ -435,23 +456,23 @@ export default function DashboardClient({
     type: 'success' | 'error';
   } | null>(null);
   const [isFullscreenEditor, setIsFullscreenEditor] = useState(false);
-  const isDesignSaved = false;
+  const [htmlDraftMode, setHtmlDraftMode] = useState(false);
+  const [rawHtmlContent, setRawHtmlContent] = useState('');
   const [showPasteInfoBanner, setShowPasteInfoBanner] = useState(false);
   const [editorInfoBanner, setEditorInfoBanner] = useState<string | null>(null);
   const [referencePanelSections, setReferencePanelSections] = useState<string[]>([]);
   const [isReferencePanelOpen, setIsReferencePanelOpen] = useState(true);
+  const [pendingPresetToLoad, setPendingPresetToLoad] = useState<PresetKey | null>(
+    null
+  );
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
+  const [isDesignSaved, setIsDesignSaved] = useState(false);
   const [sendState, setSendState] = useState<{
     status: 'idle' | 'loading' | 'success' | 'error';
     message: string;
   }>({ status: 'idle', message: '' });
-  const uploadHtmlInputRef = useRef<HTMLInputElement | null>(null);
-
-  function pushEditorContent(html: string) {
-    setEditorHtml(html);
-    setPreviewHtml(html);
-    setEditorMountNonce((n) => n + 1);
-  }
+  const emailEditorRef = useRef<EmailEditorHandle | null>(null);
+  const uploadJsonInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setPendingDraftsCount(draftsCountProp);
@@ -472,9 +493,7 @@ export default function DashboardClient({
       if (!res.ok || !payload.drafts) {
         return;
       }
-      const pending = payload.drafts.filter(
-        (d) => normalizeStatus(d.status) === 'draft'
-      ).length;
+      const pending = payload.drafts.filter((d) => d.status === 'draft').length;
       setPendingDraftsCount(pending);
       router.refresh();
     } catch {
@@ -485,55 +504,22 @@ export default function DashboardClient({
   const loadDraftsList = useCallback(async () => {
     setDraftsLoading(true);
     setDraftsError(null);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
     try {
-      const res = await fetch('/api/drafts', {
-        method: 'GET',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-      const data = (await res.json()) as unknown;
-      console.log('drafts loaded:', data);
-
-      if (!res.ok) {
-        const apiError =
-          typeof data === 'object' &&
-          data !== null &&
-          'error' in data &&
-          typeof (data as { error?: unknown }).error === 'string'
-            ? (data as { error: string }).error
-            : 'Failed to load drafts';
-        setDraftsError(apiError);
-        setDrafts([]);
+      const res = await fetch('/api/drafts');
+      const payload = (await res.json()) as
+        | { drafts: NewsletterDraft[] }
+        | { error: string };
+      if (!res.ok || !('drafts' in payload)) {
+        setDraftsError(
+          'error' in payload ? payload.error : 'Failed to load drafts'
+        );
         return;
       }
-
-      const normalized = (
-        (typeof data === 'object' &&
-        data !== null &&
-        'drafts' in data &&
-        Array.isArray((data as { drafts?: unknown }).drafts)
-          ? (data as { drafts: NewsletterDraft[] }).drafts
-          : Array.isArray(data)
-            ? (data as NewsletterDraft[])
-            : []) ?? []
-      ) as NewsletterDraft[];
-
-      setDrafts(normalized);
+      setDrafts(payload.drafts);
     } catch (e) {
-      clearTimeout(timeout);
-      console.error('fetchDrafts error:', e);
-      setDrafts([]);
-      if (e instanceof DOMException && e.name === 'AbortError') {
-        setDraftsError('Loading took too long — please refresh');
-      } else {
-        setDraftsError('Failed to load drafts');
-      }
+      console.error(e);
+      setDraftsError('Failed to load drafts');
     } finally {
-      clearTimeout(timeout);
       setDraftsLoading(false);
     }
   }, []);
@@ -558,15 +544,15 @@ export default function DashboardClient({
     );
   }, [query, subscribers]);
   const draftItems = useMemo(
-    () => drafts.filter((entry) => normalizeStatus(entry.status) === 'draft'),
+    () => drafts.filter((entry) => entry.status?.toLowerCase() === 'draft'),
     [drafts]
   );
   const archivedItems = useMemo(
-    () => drafts.filter((entry) => normalizeStatus(entry.status) === 'archived'),
+    () => drafts.filter((entry) => entry.status?.toLowerCase() === 'archived'),
     [drafts]
   );
   const sentItems = useMemo(
-    () => drafts.filter((entry) => normalizeStatus(entry.status) === 'sent'),
+    () => drafts.filter((entry) => entry.status?.toLowerCase() === 'sent'),
     [drafts]
   );
 
@@ -576,7 +562,7 @@ export default function DashboardClient({
   );
   const trend = useMemo(() => getTrend(growthData), [growthData]);
   const emailBodyStats = useMemo(() => {
-    const source = editorHtml || previewHtml;
+    const source = htmlDraftMode ? rawHtmlContent : previewHtml;
     const text = source
       .replace(/<style[\s\S]*?<\/style>/gi, ' ')
       .replace(/<script[\s\S]*?<\/script>/gi, ' ')
@@ -586,7 +572,9 @@ export default function DashboardClient({
     const characters = text.length;
     const words = text ? text.split(' ').length : 0;
     return { words, characters };
-  }, [editorHtml, previewHtml]);
+  }, [htmlDraftMode, rawHtmlContent, previewHtml]);
+
+  const newsletterReady = htmlDraftMode || editorReady;
 
   async function handlePreviewNewsletter() {
     if (!subject.trim()) {
@@ -597,34 +585,68 @@ export default function DashboardClient({
       return;
     }
 
-    const html = editorHtml.trim();
-    if (!html) {
-      setSendState({
-        status: 'error',
-        message: 'Please add HTML content before previewing.',
-      });
+    if (htmlDraftMode) {
+      const html = rawHtmlContent.trim();
+      if (!html) {
+        setSendState({
+          status: 'error',
+          message: 'Add HTML content before preview.',
+        });
+        return;
+      }
+      setPreviewHtml(html);
+      setShowPreview(true);
+      setPreviewSourceDraft(null);
+      setSendState({ status: 'idle', message: '' });
       return;
     }
-    setPreviewHtml(html);
-    setShowPreview(true);
-    setPreviewSourceDraft(null);
-    setSendState({ status: 'idle', message: '' });
+
+    try {
+      const html = await emailEditorRef.current?.getHtml();
+      if (!html) {
+        setSendState({
+          status: 'error',
+          message: 'Email editor is not ready yet.',
+        });
+        return;
+      }
+      setPreviewHtml(html);
+      setShowPreview(true);
+      setPreviewSourceDraft(null);
+      setSendState({ status: 'idle', message: '' });
+    } catch (error) {
+      console.error('Preview export failed:', error);
+      setSendState({
+        status: 'error',
+        message: 'Failed to generate preview from the email editor.',
+      });
+    }
   }
 
   async function handleSaveDesign() {
-    const html = editorHtml.trim();
-    if (!html) {
+    try {
+      const design = await emailEditorRef.current?.getJson();
+      if (!design) {
+        setSendState({
+          status: 'error',
+          message: 'Email editor is not ready yet.',
+        });
+        return;
+      }
+
+      window.localStorage.setItem(NEWSLETTER_DESIGN_KEY, JSON.stringify(design));
+      setIsDesignSaved(true);
+      setSendState({
+        status: 'success',
+        message: 'Design saved locally.',
+      });
+    } catch (error) {
+      console.error('Save design failed:', error);
       setSendState({
         status: 'error',
-        message: 'Editor HTML is empty.',
+        message: 'Failed to save design.',
       });
-      return;
     }
-    window.localStorage.setItem(NEWSLETTER_DESIGN_KEY, html);
-    setSendState({
-      status: 'success',
-      message: 'Design saved locally.',
-    });
   }
 
   function handleUploadDesignFromStorage() {
@@ -638,10 +660,20 @@ export default function DashboardClient({
         return;
       }
 
-      pushEditorContent(raw);
+      const parsed = JSON.parse(raw) as object;
+      console.log('Loading design from localStorage:', parsed);
+      if (!emailEditorRef.current) {
+        setSendState({
+          status: 'error',
+          message: 'Email editor is not ready yet.',
+        });
+        return;
+      }
+      emailEditorRef.current?.loadDesign(parsed);
+      setIsDesignSaved(true);
       setSendState({
         status: 'success',
-        message: 'Saved HTML design loaded.',
+        message: 'Saved design loaded.',
       });
     } catch (error) {
       console.error('Load design failed:', error);
@@ -652,32 +684,44 @@ export default function DashboardClient({
     }
   }
 
-  function handleUploadDesignClick() {
-    uploadHtmlInputRef.current?.click();
-  }
-
   async function handleDownloadDesign() {
-    const html = editorHtml.trim();
-    if (!html) {
+    try {
+      const design = await emailEditorRef.current?.getJson();
+      if (!design) {
+        setSendState({
+          status: 'error',
+          message: 'Email editor is not ready yet.',
+        });
+        return;
+      }
+
+      const blob = new Blob([JSON.stringify(design, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'regpulss-email-design.json';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+
+      setSendState({
+        status: 'success',
+        message: 'Design JSON downloaded.',
+      });
+    } catch (error) {
+      console.error('Download design failed:', error);
       setSendState({
         status: 'error',
-        message: 'Editor HTML is empty.',
+        message: 'Failed to download design JSON.',
       });
-      return;
     }
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'regpulss-email-design.html';
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    setSendState({
-      status: 'success',
-      message: 'Design HTML downloaded.',
-    });
+  }
+
+  function handleUploadDesignClick() {
+    uploadJsonInputRef.current?.click();
   }
 
   async function handleUploadDesignFile(event: ChangeEvent<HTMLInputElement>) {
@@ -688,17 +732,20 @@ export default function DashboardClient({
 
     try {
       const content = await file.text();
-      pushEditorContent(content);
-      window.localStorage.setItem(NEWSLETTER_DESIGN_KEY, content);
+      const parsed = JSON.parse(content) as object;
+      console.log('Loading design from uploaded JSON:', parsed);
+      emailEditorRef.current?.loadDesign(parsed);
+      window.localStorage.setItem(NEWSLETTER_DESIGN_KEY, JSON.stringify(parsed));
+      setIsDesignSaved(true);
       setSendState({
         status: 'success',
-        message: 'HTML design uploaded successfully.',
+        message: 'Design uploaded successfully.',
       });
     } catch (error) {
       console.error('Upload design failed:', error);
       setSendState({
         status: 'error',
-        message: 'Invalid HTML file. Could not load design.',
+        message: 'Invalid JSON file. Could not load design.',
       });
     } finally {
       event.target.value = '';
@@ -737,10 +784,35 @@ export default function DashboardClient({
 
   function handleApplyPreset(key: PresetKey) {
     const preset = getPresetByKey(key);
-    pushEditorContent(preset.html);
+    if (htmlDraftMode) {
+      setRawHtmlContent(preset.html);
+      setPreviewHtml(preset.html);
+      setIsPresetModalOpen(false);
+      showToast(setToast, `${preset.title} preset applied.`, 'success');
+      return;
+    }
+
+    if (!emailEditorRef.current) {
+      showToast(setToast, 'Email editor is not ready yet.', 'error');
+      return;
+    }
+    emailEditorRef.current.loadDesign(preset.design);
+    setIsDesignSaved(false);
     setIsPresetModalOpen(false);
     showToast(setToast, `${preset.title} preset applied.`, 'success');
   }
+
+  useEffect(() => {
+    if (!pendingPresetToLoad || !editorReady || htmlDraftMode) {
+      return;
+    }
+    const preset = getPresetByKey(pendingPresetToLoad);
+    if (emailEditorRef.current) {
+      emailEditorRef.current.loadDesign(preset.design);
+      setIsDesignSaved(false);
+      setPendingPresetToLoad(null);
+    }
+  }, [pendingPresetToLoad, editorReady, htmlDraftMode]);
 
   async function copyTextToClipboard(text: string, successMessage: string) {
     try {
@@ -768,7 +840,12 @@ export default function DashboardClient({
     const plain = extractPlainTextFromHtml(draft.html_content ?? '');
     setSubject(draft.subject ?? '');
     setEditingDraftId(draft.id);
-    pushEditorContent(PRESET_STANDARD_HTML);
+    setHtmlDraftMode(false);
+    setRawHtmlContent('');
+    setEditorReady(false);
+    setInitialDesign(undefined);
+    setEditorDesignKey((k) => k + 1);
+    setPendingPresetToLoad('standard');
     setShowPasteInfoBanner(true);
     setEditorInfoBanner('Paste your copied content into the blocks below');
     setReferencePanelSections(splitDraftIntoSections(plain));
@@ -779,19 +856,161 @@ export default function DashboardClient({
   function handleEditDraft(draft: NewsletterDraft) {
     setSubject(draft.subject ?? '');
     setEditingDraftId(draft.id);
+    setIsDesignSaved(false);
     setIsFullscreenEditor(false);
-    setShowPasteInfoBanner(false);
-    setEditorInfoBanner(null);
-    setReferencePanelSections([]);
-    const html = draft.html_content?.trim()
-      ? draft.html_content
-      : PRESET_STANDARD_HTML;
-    pushEditorContent(html ?? PRESET_STANDARD_HTML);
+
+    if (draftHasJsonContent(draft.json_content)) {
+      setHtmlDraftMode(false);
+      setRawHtmlContent('');
+      setShowPasteInfoBanner(false);
+      setEditorInfoBanner(null);
+      setReferencePanelSections([]);
+      setEditorReady(false);
+      setInitialDesign(draft.json_content as object);
+      setEditorDesignKey((k) => k + 1);
+      setPreviewHtml(draft.html_content ?? '');
+    } else {
+      setHtmlDraftMode(true);
+      setShowPasteInfoBanner(false);
+      setEditorInfoBanner(null);
+      setReferencePanelSections([]);
+      setEditorReady(false);
+      setInitialDesign(undefined);
+      const html = draft.html_content ?? '';
+      setRawHtmlContent(html);
+      setPreviewHtml(html);
+      setEditorDesignKey((k) => k + 1);
+    }
     setActiveSection('newsletter');
   }
 
+  async function handleSaveHtmlDraftChanges() {
+    if (!editingDraftId || !htmlDraftMode) {
+      showToast(setToast, 'No AI draft is being edited.', 'error');
+      return;
+    }
+
+    const html = rawHtmlContent.trim();
+    if (!html) {
+      showToast(setToast, 'HTML content is required.', 'error');
+      return;
+    }
+
+    const title = subject.trim() || 'Untitled draft';
+    const subj = subject.trim();
+
+    try {
+      const res = await fetch(`/api/drafts/${editingDraftId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          subject: subj,
+          html_content: html,
+        }),
+      });
+      const payload = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        showToast(
+          setToast,
+          payload.error ?? 'Failed to save draft',
+          'error'
+        );
+        return;
+      }
+      showToast(setToast, 'Draft saved.', 'success');
+      void refreshDraftsCount();
+      void loadDraftsList();
+    } catch (error) {
+      console.error(error);
+      showToast(setToast, 'Failed to save draft.', 'error');
+    }
+  }
+
   async function handleSaveAsDraft() {
-    const html = editorHtml;
+    if (htmlDraftMode) {
+      const html = rawHtmlContent.trim();
+      if (!html) {
+        showToast(setToast, 'Add content before saving a draft.', 'error');
+        return;
+      }
+
+      const title = subject.trim() || 'Untitled draft';
+      const subj = subject.trim();
+
+      try {
+        if (editingDraftId) {
+          const res = await fetch(`/api/drafts/${editingDraftId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title,
+              subject: subj,
+              html_content: html,
+            }),
+          });
+          const payload = (await res.json()) as { error?: string };
+          if (!res.ok) {
+            showToast(
+              setToast,
+              payload.error ?? 'Failed to save draft',
+              'error'
+            );
+            return;
+          }
+          showToast(setToast, 'Draft saved.', 'success');
+        } else {
+          const res = await fetch('/api/drafts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title,
+              subject: subj,
+              html_content: html,
+              json_content: {},
+            }),
+          });
+          const payload = (await res.json()) as {
+            error?: string;
+            draft?: { id: string };
+          };
+          if (!res.ok) {
+            showToast(
+              setToast,
+              payload.error ?? 'Failed to save draft',
+              'error'
+            );
+            return;
+          }
+          if (payload.draft?.id) {
+            setEditingDraftId(payload.draft.id);
+          }
+          showToast(setToast, 'Draft saved.', 'success');
+        }
+        void refreshDraftsCount();
+        void loadDraftsList();
+      } catch (error) {
+        console.error(error);
+        showToast(setToast, 'Failed to save draft.', 'error');
+      }
+      return;
+    }
+
+    if (!editorReady) {
+      showToast(setToast, 'Email editor is not ready yet.', 'error');
+      return;
+    }
+
+    let html = '';
+    let json: object | null = null;
+    try {
+      html = (await emailEditorRef.current?.getHtml()) ?? '';
+      json = (await emailEditorRef.current?.getJson()) ?? null;
+    } catch (error) {
+      console.error(error);
+      showToast(setToast, 'Failed to read the email editor.', 'error');
+      return;
+    }
 
     if (!html.trim()) {
       showToast(setToast, 'Add content before saving a draft.', 'error');
@@ -810,6 +1029,7 @@ export default function DashboardClient({
             title,
             subject: subj,
             html_content: html,
+            json_content: json ?? {},
           }),
         });
         const payload = (await res.json()) as { error?: string };
@@ -830,6 +1050,7 @@ export default function DashboardClient({
             title,
             subject: subj,
             html_content: html,
+            json_content: json ?? {},
           }),
         });
         const payload = (await res.json()) as {
@@ -941,7 +1162,8 @@ export default function DashboardClient({
       showToast(setToast, 'Draft deleted.', 'success');
       if (editingDraftId === draft.id) {
         setEditingDraftId(null);
-        pushEditorContent('');
+        setHtmlDraftMode(false);
+        setRawHtmlContent('');
       }
       void loadDraftsList();
       void refreshDraftsCount();
@@ -974,7 +1196,8 @@ export default function DashboardClient({
       showToast(setToast, 'Draft archived.', 'success');
       if (editingDraftId === draft.id) {
         setEditingDraftId(null);
-        pushEditorContent('');
+        setHtmlDraftMode(false);
+        setRawHtmlContent('');
       }
       void loadDraftsList();
       void refreshDraftsCount();
@@ -1038,7 +1261,7 @@ export default function DashboardClient({
     }
   }
 
-  function handleEditPreviewInEditor() {
+  function handleEditPreviewInUnlayer() {
     if (!previewSourceDraft) {
       showToast(setToast, 'No draft loaded in preview.', 'error');
       return;
@@ -1050,14 +1273,20 @@ export default function DashboardClient({
       return;
     }
 
+    const design = convertHtmlToUnlayerDesign(html);
     setShowPreview(false);
-    setPreviewSourceDraft(null);
+    setHtmlDraftMode(false);
+    setRawHtmlContent('');
     setShowPasteInfoBanner(false);
-    setEditorInfoBanner('Editing AI draft in HTML editor');
+    setEditorInfoBanner(
+      'Editing AI draft in visual editor — you can now drag and drop blocks'
+    );
     setReferencePanelSections([]);
     setSubject(previewSourceDraft.subject ?? '');
     setEditingDraftId(previewSourceDraft.id);
-    pushEditorContent(html);
+    setInitialDesign(design);
+    setEditorReady(false);
+    setEditorDesignKey((k) => k + 1);
     setActiveSection('newsletter');
   }
 
@@ -1070,7 +1299,22 @@ export default function DashboardClient({
       return;
     }
 
-    const html = editorHtml;
+    let html = '';
+    if (htmlDraftMode) {
+      html = rawHtmlContent.trim();
+    } else {
+      try {
+        const exported = await emailEditorRef.current?.getHtml();
+        html = exported ?? '';
+      } catch (error) {
+        console.error('Send export failed:', error);
+        setSendState({
+          status: 'error',
+          message: 'Failed to export HTML from the email editor.',
+        });
+        return;
+      }
+    }
 
     if (!html.trim()) {
       setSendState({
@@ -1318,7 +1562,7 @@ export default function DashboardClient({
                   ) : (
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                       {draftItems.map((draft) => {
-                        const isBotDraft = hasBotDraftContent(draft.json_content);
+                        const isBotDraft = !draftHasJsonContent(draft.json_content);
                         const busy = draftActionId === draft.id;
                         return (
                           <Card key={draft.id} className="border shadow-sm">
@@ -1706,14 +1950,14 @@ export default function DashboardClient({
                         </div>
                       ) : null}
 
-                      {showPasteInfoBanner || editorInfoBanner ? (
+                      {!htmlDraftMode && (showPasteInfoBanner || editorInfoBanner) ? (
                         <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
                           {editorInfoBanner ??
                             'Paste your copied content into the blocks below'}
                         </div>
                       ) : null}
 
-                      {referencePanelSections.length > 0 ? (
+                      {!htmlDraftMode && referencePanelSections.length > 0 ? (
                         <div className="rounded-md border border-slate-200 bg-slate-50">
                           <div className="flex items-center justify-between gap-2 px-4 py-3">
                             <p className="text-sm font-medium">
@@ -1765,7 +2009,94 @@ export default function DashboardClient({
                         </div>
                       ) : null}
 
-                      <>
+                      {htmlDraftMode ? (
+                        <>
+                          <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                            AI-generated draft — edit HTML directly below
+                          </div>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <label
+                              htmlFor="newsletter-html-raw"
+                              className="text-sm text-muted-foreground"
+                            >
+                              Email body (HTML)
+                            </label>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleOpenPresetModal}
+                                disabled={sendState.status === 'loading'}
+                              >
+                                Apply Preset
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handlePreviewNewsletter}
+                                disabled={sendState.status === 'loading'}
+                              >
+                                Preview
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => void handleSaveHtmlDraftChanges()}
+                                disabled={sendState.status === 'loading'}
+                              >
+                                Save changes
+                              </Button>
+                            </div>
+                          </div>
+                          <textarea
+                            id="newsletter-html-raw"
+                            className="w-full min-h-[600px] resize-y overflow-auto rounded-md border border-input bg-background p-3 font-mono text-sm leading-relaxed whitespace-pre"
+                            style={{ height: '600px' }}
+                            value={rawHtmlContent}
+                            onChange={(event) => {
+                              const v = event.target.value;
+                              setRawHtmlContent(v);
+                              setPreviewHtml(v);
+                            }}
+                            spellCheck={false}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            {emailBodyStats.words} words •{' '}
+                            {emailBodyStats.characters} characters
+                          </p>
+                          <div className="border-t border-[var(--color-border)] pt-4">
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                  onClick={handleOpenPresetModal}
+                                  disabled={sendState.status === 'loading'}
+                                >
+                                  Apply Preset
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                onClick={() => void handleSaveAsDraft()}
+                                disabled={sendState.status === 'loading'}
+                              >
+                                Save as Draft
+                              </Button>
+                              <Button
+                                type="button"
+                                onClick={handleSendNewsletter}
+                                disabled={sendState.status === 'loading'}
+                                className="bg-[#E53E3E] text-white hover:bg-[#c53030]"
+                              >
+                                {sendState.status === 'loading'
+                                  ? 'Sending...'
+                                  : 'Send Newsletter'}
+                              </Button>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <label
                               htmlFor="newsletter-editor"
@@ -1780,6 +2111,7 @@ export default function DashboardClient({
                                 onClick={() =>
                                   setIsFullscreenEditor((value) => !value)
                                 }
+                                disabled={!editorReady}
                               >
                                 {isFullscreenEditor ? (
                                   <>
@@ -1797,7 +2129,10 @@ export default function DashboardClient({
                                 type="button"
                                 variant="outline"
                                 onClick={handlePreviewNewsletter}
-                                disabled={sendState.status === 'loading'}
+                                disabled={
+                                  !newsletterReady ||
+                                  sendState.status === 'loading'
+                                }
                               >
                                 Preview
                               </Button>
@@ -1805,7 +2140,10 @@ export default function DashboardClient({
                                 type="button"
                                 variant="outline"
                                 onClick={handleSaveDesign}
-                                disabled={sendState.status === 'loading'}
+                                disabled={
+                                  !newsletterReady ||
+                                  sendState.status === 'loading'
+                                }
                               >
                                 Save Design
                                 <span
@@ -1855,7 +2193,10 @@ export default function DashboardClient({
                                       type="button"
                                       variant="outline"
                                       onClick={handleSaveDesign}
-                                      disabled={sendState.status === 'loading'}
+                                      disabled={
+                                        !newsletterReady ||
+                                        sendState.status === 'loading'
+                                      }
                                     >
                                       Save Design
                                       <span
@@ -1871,7 +2212,10 @@ export default function DashboardClient({
                                       type="button"
                                       variant="outline"
                                       onClick={handleUploadDesignFromStorage}
-                                      disabled={sendState.status === 'loading'}
+                                      disabled={
+                                        !newsletterReady ||
+                                        sendState.status === 'loading'
+                                      }
                                     >
                                       Upload Design
                                     </Button>
@@ -1879,7 +2223,10 @@ export default function DashboardClient({
                                       type="button"
                                       variant="outline"
                                       onClick={handleUploadDesignClick}
-                                      disabled={sendState.status === 'loading'}
+                                      disabled={
+                                        !newsletterReady ||
+                                        sendState.status === 'loading'
+                                      }
                                     >
                                       Upload JSON
                                     </Button>
@@ -1887,7 +2234,10 @@ export default function DashboardClient({
                                       type="button"
                                       variant="outline"
                                       onClick={handleOpenPresetModal}
-                                      disabled={sendState.status === 'loading'}
+                                      disabled={
+                                        !newsletterReady ||
+                                        sendState.status === 'loading'
+                                      }
                                     >
                                       Apply Preset
                                     </Button>
@@ -1895,7 +2245,10 @@ export default function DashboardClient({
                                       type="button"
                                       variant="outline"
                                       onClick={handleDownloadDesign}
-                                      disabled={sendState.status === 'loading'}
+                                      disabled={
+                                        !newsletterReady ||
+                                        sendState.status === 'loading'
+                                      }
                                     >
                                       Download JSON
                                     </Button>
@@ -1903,7 +2256,10 @@ export default function DashboardClient({
                                       type="button"
                                       variant="outline"
                                       onClick={handlePreviewNewsletter}
-                                      disabled={sendState.status === 'loading'}
+                                      disabled={
+                                        !newsletterReady ||
+                                        sendState.status === 'loading'
+                                      }
                                     >
                                       Preview
                                     </Button>
@@ -1911,14 +2267,20 @@ export default function DashboardClient({
                                       type="button"
                                       variant="outline"
                                       onClick={() => void handleSaveAsDraft()}
-                                      disabled={sendState.status === 'loading'}
+                                      disabled={
+                                        !newsletterReady ||
+                                        sendState.status === 'loading'
+                                      }
                                     >
                                       Save as Draft
                                     </Button>
                                     <Button
                                       type="button"
                                       onClick={handleSendNewsletter}
-                                      disabled={sendState.status === 'loading'}
+                                      disabled={
+                                        !newsletterReady ||
+                                        sendState.status === 'loading'
+                                      }
                                       className="bg-[#E53E3E] text-white hover:bg-[#c53030]"
                                     >
                                       {sendState.status === 'loading'
@@ -1928,21 +2290,21 @@ export default function DashboardClient({
                                   </div>
                                 </div>
                               ) : null}
-                              <div className="w-full min-h-[500px]">
-                                <GrapesEditor
-                                  key={`${editingDraftId ?? 'new'}-${editorMountNonce}`}
-                                  initialHtml={editorHtml}
-                                  onChange={(html) => {
-                                    setEditorHtml(html);
-                                    setPreviewHtml(html);
-                                  }}
-                                  height={
-                                    isFullscreenEditor
-                                      ? 'calc(100vh - 130px)'
-                                      : '700px'
-                                  }
-                                />
-                              </div>
+                              <DashboardEmailEditor
+                                key={editorDesignKey}
+                                ref={emailEditorRef}
+                                onReady={() => setEditorReady(true)}
+                                onExportHtml={(html) => {
+                                  setPreviewHtml(html);
+                                  setIsDesignSaved(false);
+                                }}
+                                initialDesign={initialDesign}
+                                minHeight={
+                                  isFullscreenEditor
+                                    ? 'calc(100vh - 130px)'
+                                    : 750
+                                }
+                              />
                             </div>
                           </div>
                           <p className="text-xs text-muted-foreground">
@@ -1956,7 +2318,10 @@ export default function DashboardClient({
                                   type="button"
                                   variant="outline"
                                   onClick={handleUploadDesignFromStorage}
-                                  disabled={sendState.status === 'loading'}
+                                  disabled={
+                                    !newsletterReady ||
+                                    sendState.status === 'loading'
+                                  }
                                 >
                                   Upload Design
                                 </Button>
@@ -1964,7 +2329,10 @@ export default function DashboardClient({
                                   type="button"
                                   variant="outline"
                                   onClick={handleUploadDesignClick}
-                                  disabled={sendState.status === 'loading'}
+                                  disabled={
+                                    !newsletterReady ||
+                                    sendState.status === 'loading'
+                                  }
                                 >
                                   Upload JSON
                                 </Button>
@@ -1972,7 +2340,10 @@ export default function DashboardClient({
                                   type="button"
                                   variant="outline"
                                   onClick={handleOpenPresetModal}
-                                  disabled={sendState.status === 'loading'}
+                                  disabled={
+                                    !newsletterReady ||
+                                    sendState.status === 'loading'
+                                  }
                                 >
                                   Apply Preset
                                 </Button>
@@ -1980,7 +2351,10 @@ export default function DashboardClient({
                                   type="button"
                                   variant="outline"
                                   onClick={handleDownloadDesign}
-                                  disabled={sendState.status === 'loading'}
+                                  disabled={
+                                    !newsletterReady ||
+                                    sendState.status === 'loading'
+                                  }
                                 >
                                   Download JSON
                                 </Button>
@@ -1990,14 +2364,20 @@ export default function DashboardClient({
                                   type="button"
                                   variant="outline"
                                   onClick={() => void handleSaveAsDraft()}
-                                  disabled={sendState.status === 'loading'}
+                                  disabled={
+                                    !newsletterReady ||
+                                    sendState.status === 'loading'
+                                  }
                                 >
                                   Save as Draft
                                 </Button>
                                 <Button
                                   type="button"
                                   onClick={handleSendNewsletter}
-                                  disabled={sendState.status === 'loading'}
+                                  disabled={
+                                    !newsletterReady ||
+                                    sendState.status === 'loading'
+                                  }
                                   className="bg-[#E53E3E] text-white hover:bg-[#c53030]"
                                 >
                                   {sendState.status === 'loading'
@@ -2007,7 +2387,8 @@ export default function DashboardClient({
                               </div>
                             </div>
                           </div>
-                      </>
+                        </>
+                      )}
                     </div>
                     {sendState.status !== 'idle' ? (
                       <p
@@ -2022,9 +2403,9 @@ export default function DashboardClient({
                       </p>
                     ) : null}
                     <input
-                      ref={uploadHtmlInputRef}
+                      ref={uploadJsonInputRef}
                       type="file"
-                      accept=".html,.htm,text/html"
+                      accept=".json"
                       className="hidden"
                       onChange={handleUploadDesignFile}
                     />
@@ -2141,14 +2522,14 @@ export default function DashboardClient({
                       Mobile
                     </Button>
                     {previewSourceDraft &&
-                    hasBotDraftContent(previewSourceDraft.json_content) ? (
+                    !draftHasJsonContent(previewSourceDraft.json_content) ? (
                       <Button
                         type="button"
                         variant="default"
                         className="bg-[#E53E3E] text-white hover:bg-[#c53030]"
-                        onClick={handleEditPreviewInEditor}
+                        onClick={handleEditPreviewInUnlayer}
                       >
-                        Edit in Editor
+                        Edit in Unlayer
                       </Button>
                     ) : null}
                   </div>
