@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createClient } from '@/utils/supabase/server';
+import { render } from '@react-email/render';
+import RegPulssNewsletter from '@/emails/RegPulssNewsletter';
+import * as React from 'react';
 
 // Email system:
 // - Newsletters: designed in Unlayer editor, sent as raw HTML
@@ -94,12 +97,16 @@ export async function POST(request: Request) {
   const emailChunks = chunkEmails(emails, 50);
 
   try {
+    const emailHtml = await render(
+      React.createElement(RegPulssNewsletter, { contentHtml: html })
+    );
+
     for (const to of emailChunks) {
       await resend.emails.send({
         from: 'noreply@regpulss.lv',
         to,
         subject,
-        html,
+        html: emailHtml,
       });
     }
   } catch (sendError) {
